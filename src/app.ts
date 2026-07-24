@@ -7,6 +7,7 @@ import { MemoryService } from "./services/memory.js";
 import { ConsolidationService } from "./services/consolidation.js";
 import { PromotionService } from "./services/promotion.js";
 import { ReflectService } from "./services/reflect.js";
+import { runStartupMaintenance } from "./startup.js";
 
 export interface UmgApp {
   cfg: UmgConfig;
@@ -53,4 +54,16 @@ export function createApp(options?: {
     reflect,
     close: () => store.close(),
   };
+}
+
+/** Create app and run startup maintenance (light prune if stale). */
+export async function bootstrapApp(options?: {
+  configPath?: string;
+  dbPath?: string;
+  cfg?: UmgConfig;
+  skipStartupPrune?: boolean;
+}): Promise<UmgApp> {
+  const app = createApp(options);
+  await runStartupMaintenance(app, { skip: options?.skipStartupPrune });
+  return app;
 }

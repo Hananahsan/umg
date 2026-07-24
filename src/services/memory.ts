@@ -17,6 +17,7 @@ import {
   isLowInformation,
   rankForRecall,
 } from "./scoring.js";
+import { shouldSupersede } from "./contradiction.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { nowIso, summarize, truncate, uniqueStrings } from "../util/text.js";
@@ -101,7 +102,8 @@ export class MemoryService {
     const namespace = input.namespace ?? this.cfg.default_namespace;
     const now = nowIso();
 
-    // Merge-on-write
+    // Merge / supersede on write
+    let supersedesId: string | null = null;
     if (!input.skip_merge) {
       const similar = await this.store.findSimilar(body, {
         namespace,
@@ -110,37 +112,70 @@ export class MemoryService {
       });
       const best = similar[0];
       const threshold = this.cfg.consolidation.merge_threshold;
-      if (best && best.score >= threshold) {
-        const merged = await this.mergeInto(best, {
-          content: body,
-          importance,
-          tags: input.tags,
-          entities: input.entities,
-          session_id: input.session_id,
-          metadata: input.metadata,
-          confidence: input.confidence,
-          source: input.source,
-        });
-        await emitEvent(
-          this.store,
-          this.cfg,
-          "merge",
-          {
-            into: merged.id,
-            score: best.score,
-            content_preview: truncate(body, 100),
-          },
-          merged.id,
+
+      if (best) {
+        const decision = shouldSupersede(
+          body,
+          best.content,
+          best.score,
+          threshold,
         );
-        this.writeCount++;
-        await this.maybeLightPrune();
-        return {
-          action: "merged",
-          id: merged.id,
-          tier: merged.tier,
-          merged_into: merged.id,
-          memory: merged,
-        };
+
+        // Contradiction: keep newer claim, archive older, link lineage
+        if (decision.supersede) {
+          supersedesId = best.id;
+          await this.store.archive(best.id);
+          await this.store.update(best.id, {
+            metadata: {
+              ...best.metadata,
+              superseded_reason: decision.reason,
+              superseded_at: now,
+            },
+          });
+          await emitEvent(
+            this.store,
+            this.cfg,
+            "archive",
+            {
+              reason: "superseded",
+              contradiction: decision.reason,
+              by_preview: truncate(body, 100),
+              old_preview: truncate(best.content, 100),
+            },
+            best.id,
+          );
+        } else if (best.score >= threshold) {
+          const merged = await this.mergeInto(best, {
+            content: body,
+            importance,
+            tags: input.tags,
+            entities: input.entities,
+            session_id: input.session_id,
+            metadata: input.metadata,
+            confidence: input.confidence,
+            source: input.source,
+          });
+          await emitEvent(
+            this.store,
+            this.cfg,
+            "merge",
+            {
+              into: merged.id,
+              score: best.score,
+              content_preview: truncate(body, 100),
+            },
+            merged.id,
+          );
+          this.writeCount++;
+          await this.maybeLightPrune();
+          return {
+            action: "merged",
+            id: merged.id,
+            tier: merged.tier,
+            merged_into: merged.id,
+            memory: merged,
+          };
+        }
       }
     }
 
@@ -164,9 +199,14 @@ export class MemoryService {
       expires_at: defaultExpiresAt(tier, now),
       decay_score: importance,
       embedding: null,
-      metadata: input.metadata ?? {},
-      parent_ids: [],
-      supersedes_id: null,
+      metadata: {
+        ...(input.metadata ?? {}),
+        ...(supersedesId
+          ? { supersede_reason: "contradiction", superseded_prior: supersedesId }
+          : {}),
+      },
+      parent_ids: supersedesId ? [supersedesId] : [],
+      supersedes_id: supersedesId,
     };
     memory.decay_score = computeDecayScore(memory, this.cfg, now);
 
@@ -175,13 +215,35 @@ export class MemoryService {
       this.store,
       this.cfg,
       "retain",
-      { tier, importance, namespace, preview: truncate(body, 100) },
+      {
+        tier,
+        importance,
+        namespace,
+        preview: truncate(body, 100),
+        supersedes_id: supersedesId,
+      },
       memory.id,
     );
-    log.debug("retained", { id: memory.id, tier, importance });
+    log.debug("retained", {
+      id: memory.id,
+      tier,
+      importance,
+      supersedes: supersedesId,
+    });
 
     this.writeCount++;
     await this.maybeLightPrune();
+
+    if (supersedesId) {
+      return {
+        action: "superseded",
+        id: memory.id,
+        tier: memory.tier,
+        superseded_id: supersedesId,
+        reason: "contradiction_with_prior",
+        memory,
+      };
+    }
 
     return { action: "created", id: memory.id, tier, memory };
   }

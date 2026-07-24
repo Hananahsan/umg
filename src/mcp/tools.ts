@@ -82,6 +82,7 @@ export function registerTools(server: McpServer, app: UmgApp): void {
         id: result.id,
         tier: result.tier,
         merged_into: result.merged_into,
+        superseded_id: result.superseded_id,
         reason: result.reason,
         memory: result.memory ? compactMemory(result.memory) : undefined,
       });

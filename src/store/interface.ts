@@ -36,5 +36,10 @@ export interface MemoryStore {
   purgeArchivedOlderThan(isoCutoff: string): Promise<number>;
 
   stats(defaultNamespace: string): Promise<StatsSnapshot>;
+
+  /** Key/value meta (schema version, last_prune_at, etc.). */
+  getMeta(key: string): string | null;
+  setMeta(key: string, value: string): void;
+
   close(): void;
 }

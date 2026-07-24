@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createApp } from "./app.js";
+import { bootstrapApp } from "./app.js";
 import { startMcpServer } from "./mcp/server.js";
 import { log } from "./util/log.js";
 
@@ -51,7 +51,12 @@ async function main(): Promise<void> {
   }
 
   const dbPath = getFlag(args, "--db") ?? process.env.UMG_DB_PATH;
-  const app = createApp({ dbPath });
+  // Tests set UMG_SKIP_STARTUP_PRUNE=1; MCP/CLI run maintenance by default
+  const skipStartupPrune =
+    process.env.UMG_SKIP_STARTUP_PRUNE === "1" ||
+    process.env.UMG_SKIP_STARTUP_PRUNE === "true" ||
+    hasFlag(args, "--skip-startup-prune");
+  const app = await bootstrapApp({ dbPath, skipStartupPrune });
 
   try {
     switch (cmd) {

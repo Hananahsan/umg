@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { UmgApp } from "../app.js";
 import { registerTools } from "./tools.js";
+import { registerPrompts } from "./prompts.js";
 import { log } from "../util/log.js";
 
 export async function startMcpServer(app: UmgApp): Promise<void> {
@@ -11,6 +12,7 @@ export async function startMcpServer(app: UmgApp): Promise<void> {
   });
 
   registerTools(server, app);
+  registerPrompts(server);
 
   server.resource(
     "stats",

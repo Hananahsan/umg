@@ -1,6 +1,6 @@
 {
   "name": "umg",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unified Memory Gateway — MCP-first, local-first hierarchical memory for AI agents",
   "type": "module",
   "bin": {
@@ -23,7 +23,8 @@
     "mcp": "tsx src/index.ts mcp",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "e2e": "tsx scripts/e2e.ts"
   },
   "engines": {
     "node": ">=20"

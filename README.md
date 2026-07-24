@@ -95,19 +95,24 @@ Create or edit `~/.cursor/mcp.json`:
 
 At session start:
 
-> Call `recall` with the project name and current task.
+> Call `recall` with the project name and current task.  
+> Or use MCP prompt `session-start`.
 
 When you learn something durable:
 
-> Call `retain` with a concise fact (tier semantic if it’s a preference/decision).
+> Call `retain` with a concise fact (tier semantic if it’s a preference/decision).  
+> Corrections supersede contradictory priors automatically when detected.
 
 At session end:
 
-> Call `reflect` with a short dump of decisions and preferences from this session.
+> Call `reflect` with a short dump of decisions and preferences from this session.  
+> Or use MCP prompt `session-end`.  
+> Optional Claude Code Stop hook: [examples/claude-code-hooks.md](./examples/claude-code-hooks.md).
 
 Periodically:
 
-> Call `prune` (optionally `dry_run: true` first).
+> Call `prune` (optionally `dry_run: true` first).  
+> On MCP/CLI start, UMG also runs a light prune if the last prune was >24h ago.
 
 See [examples/agent-system-prompt.md](./examples/agent-system-prompt.md).
 
@@ -152,6 +157,7 @@ umg help
 
 ```bash
 npm test
+npm run e2e
 ```
 
 ## Architecture

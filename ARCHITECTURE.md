@@ -48,9 +48,12 @@ Search: SQLite **FTS5 BM25**, with LIKE + Jaccard fallback.
 1. Normalize / truncate content  
 2. Auto-tier (unless explicit)  
 3. Reject low-information / below min importance  
-4. `findSimilar` → merge if score ≥ threshold  
+4. `findSimilar`:
+   - contradiction on same topic → **supersede** (archive prior, `supersedes_id` lineage)
+   - else similarity ≥ threshold → **merge**
 5. Else insert with default TTL  
-6. Every N writes: light prune (decay + expiry)
+6. Every N writes: light prune (decay + expiry)  
+7. On process start: light prune if `last_prune_at` missing or older than 24h
 
 ## Read path (`recall`)
 
@@ -75,10 +78,14 @@ importance = clamp(tier_prior + boosts − penalties)
 Boosts: remember/prefer/decision language, corrections, entity-dense short facts.  
 Agent-supplied importance is soft-blended (70/30).
 
-### 2. Merge
+### 2. Merge (+ contradiction supersede)
 
-On write and full prune: Jaccard + FTS candidates; merge ≥ `merge_threshold` (default 0.82).  
-Keep richer content, max importance, union tags/entities, lineage via `parent_ids`.
+On write and full prune: Jaccard + FTS candidates.
+
+- **Merge** when similarity ≥ `merge_threshold` (default 0.82) and no contradiction.  
+  Keep richer content, max importance, union tags/entities, lineage via `parent_ids`.
+- **Supersede** when heuristics detect a related contradiction (conflicting slot values, negation polarity, correction language).  
+  Archive the loser; winner stores `supersedes_id` + parent lineage. Prefer false negatives over wrong supersedes.
 
 ### 3. Decay
 

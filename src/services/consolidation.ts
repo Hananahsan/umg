@@ -3,6 +3,7 @@ import type { MemoryStore } from "../store/interface.js";
 import type { Memory, MemoryTier, PruneResult } from "../types.js";
 import { MEMORY_TIERS } from "../types.js";
 import { computeDecayScore } from "./scoring.js";
+import { shouldSupersede } from "./contradiction.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { addDaysIso, nowIso, truncate, uniqueStrings } from "../util/text.js";
@@ -92,8 +93,48 @@ export class ConsolidationService {
           exclude_id: m.id,
         });
         for (const s of similar) {
-          if (s.score < mergeThreshold) continue;
           if (mergeSeen.has(s.id)) continue;
+
+          const decision = shouldSupersede(
+            m.content,
+            s.content,
+            s.score,
+            mergeThreshold,
+          );
+
+          // Contradiction: keep newer/higher-importance, archive loser with supersedes link
+          if (decision.supersede) {
+            const winner = pickMergeTarget(m, s);
+            const loser = winner.id === m.id ? s : m;
+            details.push({
+              action: "supersede",
+              into: winner.id,
+              from: loser.id,
+              reason: decision.reason,
+              score: s.score,
+            });
+            mergeSeen.add(loser.id);
+            archived++;
+            if (!dry) {
+              await this.store.update(winner.id, {
+                supersedes_id: loser.id,
+                parent_ids: uniqueStrings([
+                  ...(winner.parent_ids ?? []),
+                  loser.id,
+                ]),
+                metadata: {
+                  ...winner.metadata,
+                  supersede_reason: decision.reason,
+                },
+                updated_at: now,
+              });
+              await this.store.archive(loser.id);
+              loser.status = "archived";
+            }
+            break;
+          }
+
+          if (s.score < mergeThreshold) continue;
           // Keep higher importance / newer as target
           const target = pickMergeTarget(m, s);
           const source = target.id === m.id ? s : m;
@@ -182,6 +223,22 @@ export class ConsolidationService {
       promoted,
       details: details.slice(0, 100),
     };
+
+    if (!dry) {
+      this.store.setMeta("last_prune_at", now);
+      this.store.setMeta(
+        "last_prune_summary",
+        JSON.stringify({
+          light,
+          decayed,
+          merged,
+          archived,
+          purged,
+          promoted,
+          at: now,
+        }),
+      );
+    }
 
     await emitEvent(this.store, this.cfg, "prune", {
       ...result,

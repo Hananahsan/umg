@@ -92,13 +92,15 @@ export interface MemoryEvent {
   detail: Record<string, unknown>;
 }
 
-export type RetainAction = "created" | "merged" | "rejected";
+export type RetainAction = "created" | "merged" | "rejected" | "superseded";
 
 export interface RetainResult {
   action: RetainAction;
   id?: string;
   tier?: MemoryTier;
   merged_into?: string;
+  /** Prior memory archived as superseded by this write. */
+  superseded_id?: string;
   reason?: string;
   memory?: Memory;
 }
