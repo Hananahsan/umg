@@ -1,0 +1,57 @@
+# Unified Memory Gateway — example config
+# Copy to ~/.umg/config.yaml or ./umg.config.yaml
+
+db_path: "~/.umg/memory.db"
+default_namespace: "global"
+log_level: "info" # debug | info | warn | error
+
+retain:
+  min_importance:
+    working: 0.15
+    episodic: 0.35
+    semantic: 0.50
+    procedural: 0.60
+  max_content_chars: 4000
+  auto_tier: true
+
+recall:
+  default_limit: 8
+  max_limit: 25
+  min_score: 0.08
+
+consolidation:
+  merge_threshold: 0.82
+  light_prune_every_n_writes: 25
+  eviction_floor: 0.12
+  archive_retention_days: 90
+  grace_period_days: 3
+  auto_promote: true
+  promote_min_recalls: 3
+  promote_min_sessions: 2
+  archive_sources_on_promote: true
+  evict_procedural: false
+  half_lives_days:
+    working: 0.5
+    episodic: 14
+    semantic: 120
+    procedural: 730
+  caps:
+    working: 50
+    episodic: 500
+    semantic: 1000
+    procedural: 200
+    global: 2000
+
+reflect:
+  max_extract: 5
+  auto_retain: true
+  llm:
+    enabled: false
+    provider: "openai_compatible"
+    model: "gpt-4.1-mini"
+    base_url: null
+    api_key_env: "UMG_LLM_API_KEY"
+
+observability:
+  event_log: true
+  max_events: 10000

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "umg": {
+      "command": "node",
+      "args": ["/Users/hananahsan/umg/dist/index.js", "mcp"],
+      "env": {
+        "UMG_DB_PATH": "/Users/hananahsan/.umg/memory.db"
+      }
+    }
+  }
+}
