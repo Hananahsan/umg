@@ -31,7 +31,7 @@ export function createApp(options?: {
   configureLogging(cfg);
   ensureDbDir(cfg.db_path);
 
-  const store = new SqliteMemoryStore(cfg.db_path);
+  const store = new SqliteMemoryStore(cfg.db_path, cfg);
   const memory = new MemoryService(store, cfg);
   const consolidation = new ConsolidationService(store, cfg);
   const promotion = new PromotionService(store, cfg, memory);

@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { statSync } from "node:fs";
 import type { MemoryStore } from "../interface.js";
 import type {
   CountFilter,
@@ -16,7 +17,8 @@ import { MEMORY_TIERS } from "../../types.js";
 import { migrate } from "./migrations.js";
 import { contentHash, jaccard, normalizeText, toFtsQuery, tokenize } from "../../util/text.js";
 import { log } from "../../util/log.js";
-import { ensureDbDir } from "../../config.js";
+import { ensureDbDir, type UmgConfig } from "../../config.js";
+import { computeMetrics7d } from "../../observability/metrics.js";
 
 interface MemoryRow {
   id: string;
@@ -93,14 +95,22 @@ function rowToMemory(row: MemoryRow): Memory {
 export class SqliteMemoryStore implements MemoryStore {
   private db: Database.Database;
   private ftsAvailable = true;
+  private dbPath: string;
+  private cfg?: UmgConfig;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, cfg?: UmgConfig) {
+    this.dbPath = dbPath;
+    this.cfg = cfg;
     if (dbPath !== ":memory:") {
       ensureDbDir(dbPath);
     }
     this.db = new Database(dbPath);
+    // Single-writer local discipline: WAL + busy_timeout for multi-client safety
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
+    this.db.pragma("synchronous = NORMAL");
+    const busy = cfg?.sqlite.busy_timeout_ms ?? 5000;
+    this.db.pragma(`busy_timeout = ${busy}`);
     migrate(this.db);
     try {
       this.db.prepare("SELECT 1 FROM memories_fts LIMIT 1").get();
@@ -517,15 +527,27 @@ export class SqliteMemoryStore implements MemoryStore {
       )
       .get() as { ad: number | null; ai: number | null };
     const events = await this.listEvents(10);
+    const db_size_bytes = this.dbFileSizeBytes();
+    const warnAt = this.cfg?.sqlite.size_warn_bytes ?? 52_428_800;
+    const windowDays = this.cfg?.observability.metrics_window_days ?? 7;
+    const metrics_7d = await computeMetrics7d(this, windowDays);
     return {
       active_by_tier,
       archived,
       total_active,
       avg_decay: avgs.ad ?? 0,
       avg_importance: avgs.ai ?? 0,
-      recent_events: events.map((e) => ({ kind: e.kind, ts: e.ts, detail: e.detail })),
+      recent_events: events.map((e) => ({
+        kind: e.kind,
+        ts: e.ts,
+        detail: e.detail,
+      })),
       db_path: this.db.name,
       namespace_default: defaultNamespace,
+      ranking_weights: this.cfg?.recall.ranking_weights,
+      db_size_bytes,
+      db_size_warn: db_size_bytes >= warnAt,
+      metrics_7d,
     };
   }
 
@@ -543,6 +565,51 @@ export class SqliteMemoryStore implements MemoryStore {
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       )
       .run(key, value);
+  }
+
+  async entityFrequency(
+    namespace: string,
+    limit = 2000,
+  ): Promise<Map<string, number>> {
+    const rows = this.db
+      .prepare(
+        `SELECT entities_json FROM memories WHERE status = 'active' AND namespace = ? LIMIT ?`,
+      )
+      .all(namespace, limit) as Array<{ entities_json: string }>;
+    const freq = new Map<string, number>();
+    for (const r of rows) {
+      const ents = parseJsonArray(r.entities_json);
+      const seen = new Set<string>();
+      for (const e of ents) {
+        const k = e.toLowerCase();
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        freq.set(k, (freq.get(k) ?? 0) + 1);
+      }
+    }
+    return freq;
+  }
+
+  dbFileSizeBytes(): number {
+    if (this.dbPath === ":memory:") return 0;
+    try {
+      return statSync(this.dbPath).size;
+    } catch {
+      return 0;
+    }
+  }
+
+  vacuum(): void {
+    this.db.exec("VACUUM");
+  }
+
+  async listArchived(limit = 5000): Promise<Memory[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM memories WHERE status = 'archived' ORDER BY updated_at DESC LIMIT ?`,
+      )
+      .all(limit) as MemoryRow[];
+    return rows.map(rowToMemory);
   }
 
   close(): void {

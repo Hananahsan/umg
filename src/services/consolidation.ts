@@ -40,6 +40,7 @@ export class ConsolidationService {
     let archived = 0;
     let purged = 0;
     let promoted = 0;
+    let proposed_skills: Array<Record<string, unknown>> | undefined;
 
     const floor = aggressive
       ? this.cfg.consolidation.eviction_floor * 1.5
@@ -117,6 +118,7 @@ export class ConsolidationService {
               s.content,
               s.score,
               mergeThreshold,
+              this.cfg.consolidation.supersede_min_confidence,
             );
 
             // CLEAR contradiction only (defer on write; prune may still supersede when clear)
@@ -239,17 +241,40 @@ export class ConsolidationService {
       archived += capResult.archived;
 
       // 6) Auto-promote (optional)
-      if (this.cfg.consolidation.auto_promote && this.promotion && !dry) {
+      if (this.cfg.consolidation.auto_promote && this.promotion) {
         try {
-          const promo = await this.promotion.autoPromote(opts.namespace);
-          promoted = promo.length;
-          for (const p of promo) {
-            details.push({
-              action: "promote",
-              reason: "auto_promote",
+          const promoteDry =
+            dry || this.cfg.consolidation.promote_dry_run_proposed;
+          const promo = await this.promotion.autoPromote(opts.namespace, {
+            dry_run: promoteDry,
+          });
+          if (promoteDry) {
+            proposed_skills = promo.map((p) => ({
+              dry_run: true,
+              rejected: p.rejected,
+              rejected_reason: p.rejected_reason,
+              title: p.memory?.content?.slice(0, 80),
+              source_ids: p.source_ids,
               id: p.id,
-              sources: p.source_ids,
-            });
+            }));
+            for (const p of promo) {
+              details.push({
+                action: "propose_skill",
+                reason: p.rejected ? "rejected" : "dry_run",
+                rejected_reason: p.rejected_reason,
+                sources: p.source_ids,
+              });
+            }
+          } else {
+            promoted = promo.filter((p) => !p.rejected && p.id).length;
+            for (const p of promo) {
+              details.push({
+                action: p.rejected ? "promote_reject" : "promote",
+                reason: p.rejected_reason ?? "auto_promote",
+                id: p.id,
+                sources: p.source_ids,
+              });
+            }
           }
         } catch (err) {
           log.warn("auto-promote failed", { error: String(err) });
@@ -281,6 +306,7 @@ export class ConsolidationService {
       archived,
       purged,
       promoted,
+      proposed_skills,
       details: details.slice(0, 100),
     };
 
@@ -355,6 +381,7 @@ export class ConsolidationService {
           importance: Math.max(target.importance, source.importance),
           access_count: target.access_count + source.access_count,
           last_accessed_at: now,
+          metadata: target.metadata ?? {},
         },
         this.cfg,
         now,

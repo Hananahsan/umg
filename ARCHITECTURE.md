@@ -26,7 +26,8 @@ Agents ──MCP stdio──► Interface (tools/resources)
 - MCP handlers never touch SQL.
 - Services never import the MCP SDK.
 - Only the SQLite adapter knows about SQLite.
-- Future backends implement `MemoryStore` — no router in v1.
+- Future backends implement `MemoryStore` — **no multi-backend router in v0.2**.
+- Process-agnostic store: a future local daemon can own one `SqliteMemoryStore` without changing tools.
 
 ## Data model
 
@@ -39,9 +40,27 @@ Each memory has:
 - **namespace** for soft isolation  
 - **entities[] / tags[]** for lightweight resolution (not a graph DB)  
 - **parent_ids** for merge/promote lineage  
-- **embedding** column reserved; unused in v1 retrieval  
+- **embedding** optional when `embeddings.enabled` (hybrid path); FTS primary offline  
 
-Search: SQLite **FTS5 BM25**, with LIKE + Jaccard fallback.
+Search: SQLite **FTS5 BM25** (+ optional cosine hybrid). LIKE + Jaccard fallback.
+
+### SQLite reliability
+
+- `journal_mode=WAL`, `busy_timeout` (default 5000ms), `synchronous=NORMAL`
+- **Single-writer discipline:** one process owns the DB. Multiple agents share one MCP stdio server.
+- `umg compact` runs `VACUUM` (+ optional archive JSONL export)
+
+### Ranking (v0.2 configurable)
+
+```
+score = w_fts·fts + w_imp·importance + w_decay·decay
+      + w_tier·tier + w_recency·recency + w_entity·entity
+```
+
+Defaults: 0.32 / 0.18 / 0.18 / 0.08 / 0.08 / 0.16. Sum should be ~1.0 (warn if not).
+
+Optional hybrid when embedding present:
+`α·fts + β·cosine + (1-α-β)·other` (defaults α=0.55, β=0.25).
 
 ## Write path (`retain`)
 

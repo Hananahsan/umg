@@ -25,6 +25,7 @@ export class PromotionService {
     content?: string;
     tags?: string[];
     namespace?: string;
+    dry_run?: boolean;
   }): Promise<PromoteResult> {
     const sources: Memory[] = [];
     for (const id of input.memory_ids) {
@@ -46,6 +47,62 @@ export class PromotionService {
         title,
         sources.map((s) => s.content),
       );
+
+    // Quality gates
+    const minChars = this.cfg.consolidation.promote_min_skill_chars;
+    if (body.length < minChars) {
+      return rejectPromote(
+        sources,
+        `skill body too short (${body.length} < ${minChars})`,
+      );
+    }
+    if (!isSkillLike(body)) {
+      return rejectPromote(sources, "failed skill-ness heuristic");
+    }
+    if (sources.length > 0) {
+      const avgImp =
+        sources.reduce((s, m) => s + m.importance, 0) / sources.length;
+      if (avgImp < this.cfg.consolidation.promote_min_avg_importance) {
+        return rejectPromote(
+          sources,
+          `cluster avg importance ${avgImp.toFixed(2)} below minimum`,
+        );
+      }
+    }
+
+    if (input.dry_run) {
+      const stub = {
+        id: "proposed",
+        tier: "procedural" as const,
+        status: "active" as const,
+        content: body,
+        namespace,
+        tags: ["skill", "auto-promoted"],
+        entities: uniqueStrings(sources.flatMap((s) => s.entities)),
+        importance: 0.9,
+        confidence: 0.7,
+        access_count: 0,
+        last_accessed_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        decay_score: 0.9,
+        metadata: { dry_run: true, skill_title: title },
+        parent_ids: sources.map((s) => s.id),
+      };
+      await emitEvent(this.store, this.cfg, "promote", {
+        dry_run: true,
+        sources: sources.map((s) => s.id),
+        title,
+      });
+      return {
+        id: "proposed",
+        memory: stub,
+        source_ids: sources.map((s) => s.id),
+        archived_sources: [],
+        dry_run: true,
+      };
+    }
+
     const tags = uniqueStrings([
       "skill",
       "procedural",
@@ -110,11 +167,15 @@ export class PromotionService {
 
   /**
    * Auto-promote via entity/tag set clustering (conservative).
-   * Requires ≥2 members in a cluster — no single-memory auto skills.
+   * Requires ≥2 members; quality gates on avg importance + skill body.
    */
-  async autoPromote(namespace?: string): Promise<PromoteResult[]> {
+  async autoPromote(
+    namespace?: string,
+    opts?: { dry_run?: boolean },
+  ): Promise<PromoteResult[]> {
     const minRecalls = this.cfg.consolidation.promote_min_recalls;
     const minSessions = this.cfg.consolidation.promote_min_sessions;
+    const dry_run = opts?.dry_run ?? false;
 
     const candidates = await this.store.list({
       namespace,
@@ -140,6 +201,12 @@ export class PromotionService {
     for (const cluster of clusters) {
       if (cluster.length < 2) continue;
 
+      const avgImp =
+        cluster.reduce((a, m) => a + m.importance, 0) / cluster.length;
+      if (avgImp < this.cfg.consolidation.promote_min_avg_importance) {
+        continue;
+      }
+
       const totalAccess = cluster.reduce((a, m) => a + m.access_count, 0);
       if (totalAccess < minRecalls) continue;
 
@@ -164,9 +231,9 @@ export class PromotionService {
         continue;
       }
 
-      // Prefer highest-access members
       const ranked = [...cluster].sort(
-        (a, b) => b.access_count - a.access_count || b.importance - a.importance,
+        (a, b) =>
+          b.access_count - a.access_count || b.importance - a.importance,
       );
 
       try {
@@ -175,6 +242,7 @@ export class PromotionService {
           title: `Skill: ${label}`,
           tags: [label, "auto-promoted"],
           namespace: cluster[0].namespace,
+          dry_run,
         });
         results.push(promo);
       } catch (err) {
@@ -184,6 +252,46 @@ export class PromotionService {
 
     return results;
   }
+}
+
+function rejectPromote(
+  sources: Memory[],
+  reason: string,
+): PromoteResult {
+  return {
+    id: "",
+    memory: {
+      id: "",
+      tier: "procedural",
+      status: "active",
+      content: "",
+      namespace: sources[0]?.namespace ?? "global",
+      tags: [],
+      entities: [],
+      importance: 0,
+      confidence: 0,
+      access_count: 0,
+      last_accessed_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      decay_score: 0,
+      metadata: {},
+      parent_ids: [],
+    },
+    source_ids: sources.map((s) => s.id),
+    archived_sources: [],
+    rejected: true,
+    rejected_reason: reason,
+  };
+}
+
+function isSkillLike(body: string): boolean {
+  if (/^Skill:/im.test(body)) return true;
+  if (/When to use:/i.test(body)) return true;
+  if (/How to\b/i.test(body)) return true;
+  if (/^\d+\.\s+\S+/m.test(body)) return true;
+  if (/Lessons:/i.test(body)) return true;
+  return false;
 }
 
 function cleanEntities(m: Memory): string[] {

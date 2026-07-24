@@ -1,22 +1,27 @@
 # umg — Unified Memory Gateway
 
 MCP-first, local-first hierarchical memory for AI agents.  
-Think **“OpenRouter for agent memory”** — start with one excellent local backend, keep the door open for more later.
+Think **“OpenRouter for agent memory”** — hierarchical local memory with **gateway architecture ready**.
+
+Marketing site: **Nura**. Technical package name remains **UMG**.
 
 **Problem it solves:** agent amnesia and re-explanation tax, without unbounded memory bloat.
 
-## Features (v0.1)
+**v0.2 positioning:** multi-backend routing is **out of scope**. One excellent local store + clean `MemoryStore` port.
 
-- **MCP tools:** `retain`, `recall`, `reflect`, `list_memories`, `prune`, `promote_to_skill`
+## Features (v0.2)
+
+- **MCP tools:** `retain`, `recall`, `reflect`, `list_memories`, `prune`, `promote_to_skill` (+ `dry_run`)
 - **Hierarchy:** working → episodic → semantic → procedural
-- **Four consolidation levers:** importance scoring, merge/dedup, decay, eviction
-- **Promotion:** repeated patterns → procedural skills
-- **Local SQLite** + FTS5 search (fully offline by default)
-- **Opinionated pruning** with aggressive caps and score floors
-- **Entity-boosted recall** (local heuristics, no embeddings)
-- **Additive-first writes** with clear-only supersede
-- **Multi-pass merge** on full prune
-- **Optional LLM reflect** (OpenAI-compatible) behind a flag
+- **Configurable ranking weights** (FTS, importance, decay, tier, recency, entity)
+- **Smarter importance:** entity density + rarity (namespace-aware)
+- **Decay:** tunable α/β, session-recency boost, tier-aware access saturation
+- **Additive-first writes** with confidence-gated supersede (≥0.75) + entity alias normalization
+- **Multi-pass merge** + promotion quality gates + proposed skills dry-run
+- **Local SQLite** WAL + busy_timeout; `umg compact`; size soft-warn
+- **7-day metrics** in `umg stats` / `umg://stats`
+- **Optional hybrid embeddings** (off by default; FTS remains primary offline path)
+- **Optional hard namespace isolation**
 
 ## Quick start (< 5 minutes)
 
@@ -46,7 +51,21 @@ npx tsx src/index.ts stats
 
 # Dry-run prune
 npx tsx src/index.ts prune --dry-run
+
+# Stats (weights + 7d metrics + size)
+npx tsx src/index.ts stats
+
+# Compact DB (VACUUM)
+npx tsx src/index.ts compact
 ```
+
+### One-liner Claude Code MCP
+
+```json
+{ "mcpServers": { "umg": { "command": "node", "args": ["/Users/hananahsan/umg/dist/index.js", "mcp"] } } }
+```
+
+**Single-writer:** one MCP process per DB file. Point all clients at the same server config — do not open multiple writers on one SQLite file.
 
 ### Connect to Claude Code
 

@@ -1,6 +1,6 @@
 {
   "name": "umg",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Unified Memory Gateway — MCP-first, local-first hierarchical memory for AI agents",
   "type": "module",
   "bin": {

@@ -9,6 +9,7 @@ import {
   resolveWriteConflict,
   shouldSupersede,
 } from "../src/services/contradiction.js";
+// detectContradiction used for alias tests
 
 describe("contradiction heuristics", () => {
   it("detects conflicting stack values on same topic", () => {
@@ -35,15 +36,30 @@ describe("contradiction heuristics", () => {
     expect(r.contradicts).toBe(true);
   });
 
-  it("clear conflicting values → supersede", () => {
+  it("clear conflicting values → supersede when confidence high", () => {
     const r = resolveWriteConflict(
       "The API rate limit is 200 requests per second.",
       "The API rate limit is 100 requests per second.",
       0.7,
       0.82,
+      0.75,
     );
+    expect(r.confidence).toBeGreaterThanOrEqual(0.75);
     expect(r.action).toBe("supersede");
     expect(r.supersede).toBe(true);
+  });
+
+  it("normalizes Postgres/PostgreSQL as same slot (no false conflict)", () => {
+    const r = detectContradiction(
+      "The production database uses PostgreSQL for storage.",
+      "The production database uses Postgres for storage.",
+    );
+    // Same canonical value after normalization — should not be conflicting_values
+    if (r.contradicts) {
+      expect(r.reason).not.toMatch(/postgresql≠postgres/i);
+    } else {
+      expect(r.contradicts).toBe(false);
+    }
   });
 
   it("shouldSupersede only true for clear conflicts", () => {

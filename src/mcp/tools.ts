@@ -201,13 +201,17 @@ export function registerTools(server: McpServer, app: UmgApp): void {
 
   server.tool(
     "promote_to_skill",
-    "Promote one or more memories into a durable procedural skill memory.",
+    "Promote one or more memories into a durable procedural skill memory. Use dry_run to propose without archiving sources.",
     {
       memory_ids: z.array(z.string()).describe("Source memory IDs"),
       title: z.string().optional(),
       content: z.string().optional().describe("Optional skill body override"),
       tags: z.array(z.string()).optional(),
       namespace: z.string().optional(),
+      dry_run: z
+        .boolean()
+        .optional()
+        .describe("If true, propose skill without writing or archiving"),
     },
     async (args) => {
       const result = await app.promotion.promoteToSkill({
@@ -216,12 +220,18 @@ export function registerTools(server: McpServer, app: UmgApp): void {
         content: args.content,
         tags: args.tags,
         namespace: args.namespace,
+        dry_run: args.dry_run,
       });
       return textResult({
         id: result.id,
         source_ids: result.source_ids,
         archived_sources: result.archived_sources,
-        memory: compactMemory(result.memory),
+        dry_run: result.dry_run,
+        rejected: result.rejected,
+        rejected_reason: result.rejected_reason,
+        memory: result.memory?.content
+          ? compactMemory(result.memory)
+          : undefined,
       });
     },
   );

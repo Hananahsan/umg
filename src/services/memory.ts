@@ -21,6 +21,7 @@ import { resolveWriteConflict } from "./contradiction.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { extractEntities } from "../util/entities.js";
+import { embedText } from "../util/embeddings.js";
 import { nowIso, summarize, truncate, uniqueStrings } from "../util/text.js";
 import type { ConsolidationService } from "./consolidation.js";
 
@@ -83,7 +84,19 @@ export class MemoryService {
       return { action: "rejected", reason: "low_information", tier };
     }
 
-    const importance = computeImportance(body, tier, input.importance);
+    const namespace = input.namespace ?? this.cfg.default_namespace;
+    const now = nowIso();
+
+    // Entity rarity context (namespace-scoped, capped scan)
+    const nsCount = await this.store.count({
+      namespace,
+      status: "active",
+    });
+    const entityFreq = await this.store.entityFrequency(namespace, 2000);
+    const importance = computeImportance(body, tier, input.importance, {
+      namespaceEntityFreq: entityFreq,
+      namespaceMemoryCount: Math.max(1, nsCount),
+    });
     const minImp = this.cfg.retain.min_importance[tier];
     if (importance < minImp) {
       await emitEvent(this.store, this.cfg, "reject", {
@@ -100,9 +113,6 @@ export class MemoryService {
       };
     }
 
-    const namespace = input.namespace ?? this.cfg.default_namespace;
-    const now = nowIso();
-
     // Merge / supersede / defer on write (additive-first policy — see contradiction.ts)
     let supersedesId: string | null = null;
     let deferredMeta: Record<string, unknown> | null = null;
@@ -112,6 +122,7 @@ export class MemoryService {
     ]);
 
     if (!input.skip_merge) {
+      // Hard isolation: never findSimilar across namespaces
       const similar = await this.store.findSimilar(body, {
         namespace,
         tiers: mergeCompatibleTiers(tier),
@@ -126,6 +137,7 @@ export class MemoryService {
           best.content,
           best.score,
           threshold,
+          this.cfg.consolidation.supersede_min_confidence,
         );
 
         // CLEAR contradiction only: archive prior, link lineage
@@ -208,6 +220,9 @@ export class MemoryService {
       }
     }
 
+    // Optional embedding (never blocks retain on failure)
+    const embedding = await embedText(body, this.cfg);
+
     const memory: Memory = {
       id: newMemoryId(),
       tier,
@@ -227,7 +242,7 @@ export class MemoryService {
       updated_at: now,
       expires_at: defaultExpiresAt(tier, now),
       decay_score: importance,
-      embedding: null,
+      embedding,
       metadata: {
         ...(input.metadata ?? {}),
         ...(supersedesId
@@ -246,6 +261,7 @@ export class MemoryService {
       this.cfg,
       "retain",
       {
+        action: supersedesId ? "superseded" : "created",
         tier,
         importance,
         namespace,
@@ -343,7 +359,10 @@ export class MemoryService {
       input.limit ?? this.cfg.recall.default_limit,
       this.cfg.recall.max_limit,
     );
-    const namespace = input.namespace; // undefined = search all unless we force default
+    // Hard isolation: default to configured namespace when not provided
+    const namespace = this.cfg.namespace.hard_isolation
+      ? (input.namespace ?? this.cfg.default_namespace)
+      : input.namespace;
     const includeWorking = input.include_working ?? true;
 
     let tiers = input.tiers;
@@ -361,19 +380,35 @@ export class MemoryService {
     });
 
     const now = nowIso();
-    const ranked = rankForRecall(raw, this.cfg, now, input.query).slice(
-      0,
-      limit,
-    );
+    const queryEmbedding = this.cfg.embeddings.enabled
+      ? await embedText(input.query, this.cfg)
+      : null;
+    const ranked = rankForRecall(
+      raw,
+      this.cfg,
+      now,
+      input.query,
+      queryEmbedding,
+    ).slice(0, limit);
 
-    // Touch access (best-effort, rate-limited by store update)
+    // Touch access + session boost timestamp
     for (const m of ranked) {
       try {
+        const meta = {
+          ...m.metadata,
+          last_recalled_at: now,
+        };
         await this.store.update(m.id, {
           access_count: m.access_count + 1,
           last_accessed_at: now,
+          metadata: meta,
           decay_score: computeDecayScore(
-            { ...m, access_count: m.access_count + 1, last_accessed_at: now },
+            {
+              ...m,
+              access_count: m.access_count + 1,
+              last_accessed_at: now,
+              metadata: meta,
+            },
             this.cfg,
             now,
           ),
@@ -383,10 +418,19 @@ export class MemoryService {
       }
     }
 
+    const topScore = ranked[0]?.score ?? 0;
+    const avgDecay =
+      ranked.length > 0
+        ? ranked.reduce((s, m) => s + m.decay_score, 0) / ranked.length
+        : 0;
+
     await emitEvent(this.store, this.cfg, "recall", {
       query: truncate(input.query, 120),
       count: ranked.length,
       ids: ranked.map((m) => m.id),
+      top_score: topScore,
+      high_value: topScore >= 0.4,
+      avg_decay: avgDecay,
     });
 
     return {

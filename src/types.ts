@@ -1,4 +1,13 @@
 /** Hierarchical memory tiers. */
+
+export interface RankingWeights {
+  fts: number;
+  importance: number;
+  decay: number;
+  tier: number;
+  recency: number;
+  entity: number;
+}
 export type MemoryTier = "working" | "episodic" | "semantic" | "procedural";
 
 /** Lifecycle status. */
@@ -24,7 +33,7 @@ export interface Memory {
   updated_at: string;
   expires_at?: string | null;
   decay_score: number;
-  /** Reserved for future hybrid search; unused in v1 retrieval. */
+  /** Optional hybrid search vector; unused unless embeddings.enabled. */
   embedding?: number[] | null;
   metadata: Record<string, unknown>;
   parent_ids: string[];
@@ -55,7 +64,12 @@ export interface ListFilter {
   session_id?: string;
   limit?: number;
   offset?: number;
-  order_by?: "created_at" | "updated_at" | "importance" | "decay_score" | "last_accessed_at";
+  order_by?:
+    | "created_at"
+    | "updated_at"
+    | "importance"
+    | "decay_score"
+    | "last_accessed_at";
   order_dir?: "asc" | "desc";
 }
 
@@ -99,7 +113,6 @@ export interface RetainResult {
   id?: string;
   tier?: MemoryTier;
   merged_into?: string;
-  /** Prior memory archived as superseded by this write. */
   superseded_id?: string;
   reason?: string;
   memory?: Memory;
@@ -118,6 +131,7 @@ export interface PruneResult {
   archived: number;
   purged: number;
   promoted: number;
+  proposed_skills?: Array<Record<string, unknown>>;
   details: Array<Record<string, unknown>>;
 }
 
@@ -141,6 +155,20 @@ export interface PromoteResult {
   memory: Memory;
   source_ids: string[];
   archived_sources: string[];
+  dry_run?: boolean;
+  rejected?: boolean;
+  rejected_reason?: string;
+}
+
+export interface Metrics7d {
+  created: number;
+  archived: number;
+  skills_promoted: number;
+  prune_effectiveness: number;
+  avg_decay_on_recall: number;
+  recalls_total: number;
+  recalls_high_value: number;
+  high_value_recall_rate: number;
 }
 
 export interface StatsSnapshot {
@@ -149,9 +177,17 @@ export interface StatsSnapshot {
   total_active: number;
   avg_decay: number;
   avg_importance: number;
-  recent_events: Array<{ kind: string; ts: string; detail: Record<string, unknown> }>;
+  recent_events: Array<{
+    kind: string;
+    ts: string;
+    detail: Record<string, unknown>;
+  }>;
   db_path: string;
   namespace_default: string;
+  ranking_weights?: RankingWeights;
+  db_size_bytes?: number;
+  db_size_warn?: boolean;
+  metrics_7d?: Metrics7d;
 }
 
 export const MEMORY_TIERS: MemoryTier[] = [

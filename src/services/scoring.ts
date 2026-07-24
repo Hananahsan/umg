@@ -1,6 +1,7 @@
 import type { UmgConfig } from "../config.js";
 import type { Memory, MemoryTier, ScoredMemory } from "../types.js";
-import { entityOverlapScore } from "../util/entities.js";
+import { entityOverlapScore, extractEntities } from "../util/entities.js";
+import { cosineSimilarity } from "../util/embeddings.js";
 import { clamp, daysBetween, nowIso, tokenize } from "../util/text.js";
 
 const TIER_PRIOR: Record<MemoryTier, number> = {
@@ -23,11 +24,18 @@ const CORRECTION_RE = /\b(don't|do not|never|actually|instead|not\s+\w+\s+but)\b
 const GREETING_RE =
   /^(hi|hello|hey|thanks|thank you|ok|okay|sure|yes|no|cool|great)[\s!.]*$/i;
 
-/** Compute importance at write time. */
+export interface ImportanceContext {
+  /** entity lower → number of active memories in namespace that contain it */
+  namespaceEntityFreq?: Map<string, number>;
+  namespaceMemoryCount?: number;
+}
+
+/** Compute importance at write time (pure heuristic, offline). */
 export function computeImportance(
   content: string,
   tier: MemoryTier,
   supplied?: number,
+  ctx?: ImportanceContext,
 ): number {
   let score = TIER_PRIOR[tier];
 
@@ -35,10 +43,39 @@ export function computeImportance(
   if (CORRECTION_RE.test(content)) score += 0.15;
 
   const tokens = tokenize(content);
-  // Entity-dense short facts (identifiers, versions, paths)
-  const entityLike = tokens.filter((t) => /[0-9_/.-]/.test(t) || /^[A-Z]{2,}$/.test(t));
+  const entities = extractEntities(content);
+  const entityLike = tokens.filter(
+    (t) => /[0-9_/.-]/.test(t) || /^[A-Z]{2,}$/.test(t),
+  );
   if (tokens.length > 0 && tokens.length <= 40 && entityLike.length >= 1) {
     score += 0.1;
+  }
+
+  // Entity density: short facts with many unique entities
+  if (tokens.length > 0 && tokens.length <= 40 && entities.length > 0) {
+    const density = entities.length / tokens.length;
+    if (density >= 0.15) score += 0.08;
+  }
+
+  // Entity rarity within namespace
+  if (
+    ctx?.namespaceEntityFreq &&
+    ctx.namespaceMemoryCount &&
+    ctx.namespaceMemoryCount > 0 &&
+    entities.length > 0
+  ) {
+    let rarityBoost = 0;
+    for (const e of entities) {
+      const key = e.toLowerCase();
+      const freq = ctx.namespaceEntityFreq.get(key) ?? 0;
+      const ratio = freq / ctx.namespaceMemoryCount;
+      if (ratio <= 0.15) {
+        // rarer → higher boost, 0.05–0.12
+        const r = 1 - ratio / 0.15;
+        rarityBoost = Math.max(rarityBoost, 0.05 + 0.07 * r);
+      }
+    }
+    score += Math.min(0.12, rarityBoost);
   }
 
   if (content.length > 2000) score -= 0.1;
@@ -48,19 +85,19 @@ export function computeImportance(
   score = clamp(score);
 
   if (supplied !== undefined && !Number.isNaN(supplied)) {
-    // Soft blend: agent 70% / computed 30%
     score = clamp(0.7 * clamp(supplied) + 0.3 * score);
   }
   return score;
 }
 
-/** Heuristic auto-tier classification. */
 export function autoTier(content: string, explicit?: MemoryTier): MemoryTier {
   if (explicit) return explicit;
   const c = content.toLowerCase();
 
   if (
-    /\b(how to|steps?:|procedure|playbook|skill:|workflow|runbook)\b/i.test(content) ||
+    /\b(how to|steps?:|procedure|playbook|skill:|workflow|runbook)\b/i.test(
+      content,
+    ) ||
     content.startsWith("Skill:")
   ) {
     return "procedural";
@@ -76,12 +113,13 @@ export function autoTier(content: string, explicit?: MemoryTier): MemoryTier {
   if (/\b(currently|right now|wip|todo|today|this session|scratch)\b/i.test(c)) {
     return "working";
   }
-  // Default: episodic interaction
   return "episodic";
 }
 
-/** Default expiry by tier from created_at. */
-export function defaultExpiresAt(tier: MemoryTier, createdAt: string): string | null {
+export function defaultExpiresAt(
+  tier: MemoryTier,
+  createdAt: string,
+): string | null {
   const days: Record<MemoryTier, number | null> = {
     working: 1,
     episodic: 30,
@@ -96,69 +134,110 @@ export function defaultExpiresAt(tier: MemoryTier, createdAt: string): string | 
 }
 
 /**
- * Decay score from time + access.
- * decay = importance * (α * time_factor + β * access_factor)
- * time_factor = 0.5 ** (age_days / half_life)
+ * Decay with configurable α/β, tier-aware access saturation, session boost.
+ * session boost uses metadata.last_recalled_at when present.
  */
 export function computeDecayScore(
-  memory: Pick<Memory, "tier" | "importance" | "access_count" | "last_accessed_at">,
+  memory: Pick<
+    Memory,
+    "tier" | "importance" | "access_count" | "last_accessed_at" | "metadata"
+  >,
   cfg: UmgConfig,
   now: string = nowIso(),
 ): number {
   const halfLife = cfg.consolidation.half_lives_days[memory.tier] || 14;
   const ageDays = daysBetween(memory.last_accessed_at, now);
   const timeFactor = Math.pow(0.5, ageDays / halfLife);
-  const accessSaturation = 5;
-  const accessFactor = 1 - Math.exp(-memory.access_count / accessSaturation);
-  const alpha = 0.65;
-  const beta = 0.35;
+
+  const decayCfg = cfg.consolidation.decay;
+  const sat =
+    memory.tier === "procedural"
+      ? decayCfg.procedural_access_saturation
+      : decayCfg.access_saturation;
+  const accessFactor = 1 - Math.exp(-memory.access_count / Math.max(1, sat));
+  const alpha = decayCfg.alpha;
+  const beta = decayCfg.beta;
+
   let score = memory.importance * (alpha * timeFactor + beta * accessFactor);
-  // Procedural floor
+
   if (memory.tier === "procedural") {
     score = Math.max(score, 0.4);
   }
+
+  // Session-recency boost after recall
+  const lastRecall = memory.metadata?.last_recalled_at;
+  if (typeof lastRecall === "string" && decayCfg.session_boost > 0) {
+    const hours =
+      Math.abs(Date.parse(now) - Date.parse(lastRecall)) / (1000 * 60 * 60);
+    if (!Number.isNaN(hours)) {
+      const half = decayCfg.session_boost_half_life_hours || 4;
+      const boost = decayCfg.session_boost * Math.pow(0.5, hours / half);
+      score += boost;
+    }
+  }
+
   return clamp(score);
 }
 
 /**
- * Re-rank FTS hits with multi-factor score (v0.1.2).
- *
- * score = 0.32·fts + 0.18·importance + 0.18·decay
- *       + 0.08·tier + 0.08·recency + 0.16·entity
- *
- * Entity term: fraction of query-extracted entities matched on memory
- * entities[] (content substring fallback). Local/offline, no embeddings.
+ * Multi-factor re-rank. Weights from config. Optional hybrid cosine when embeddings present.
  */
 export function rankForRecall(
   candidates: ScoredMemory[],
   cfg: UmgConfig,
   now: string = nowIso(),
   queryText?: string,
+  queryEmbedding?: number[] | null,
 ): ScoredMemory[] {
-  const wFts = 0.32;
-  const wImp = 0.18;
-  const wDecay = 0.18;
-  const wTier = 0.08;
-  const wRecency = 0.08;
-  const wEntity = 0.16;
+  const w = cfg.recall.ranking_weights;
+  const embOn = cfg.embeddings.enabled;
+  const alpha = cfg.embeddings.hybrid_fts_weight;
+  const beta = cfg.embeddings.hybrid_cosine_weight;
+  const otherWeight = Math.max(0, 1 - alpha - beta);
 
   return candidates
     .map((m) => {
-      const fts = m.score_breakdown?.fts ?? m.score_breakdown?.jaccard ?? m.score;
+      const fts =
+        m.score_breakdown?.fts ?? m.score_breakdown?.jaccard ?? m.score;
       const decay = computeDecayScore(m, cfg, now);
       const tierP = RECALL_TIER_PRIOR[m.tier];
       const ageDays = daysBetween(m.last_accessed_at, now);
       const recency = clamp(1 - ageDays / 30);
-      const entity = queryText
-        ? entityOverlapScore(queryText, m)
-        : 0;
-      const score =
-        wFts * fts +
-        wImp * m.importance +
-        wDecay * decay +
-        wTier * tierP +
-        wRecency * recency +
-        wEntity * entity;
+      const entity = queryText ? entityOverlapScore(queryText, m) : 0;
+
+      const other =
+        w.importance * m.importance +
+        w.decay * decay +
+        w.tier * tierP +
+        w.recency * recency +
+        w.entity * entity;
+      // normalize other by sum of non-fts weights so hybrid scaling is stable
+      const otherNormBase =
+        w.importance + w.decay + w.tier + w.recency + w.entity || 1;
+      const otherNorm = other / otherNormBase;
+
+      let score: number;
+      let cosine = 0;
+
+      if (
+        embOn &&
+        queryEmbedding &&
+        m.embedding &&
+        m.embedding.length === queryEmbedding.length
+      ) {
+        cosine = (cosineSimilarity(queryEmbedding, m.embedding) + 1) / 2; // map [-1,1]→[0,1]
+        const hybridLex = alpha * fts + beta * cosine;
+        score = hybridLex + otherWeight * otherNorm;
+      } else {
+        score =
+          w.fts * fts +
+          w.importance * m.importance +
+          w.decay * decay +
+          w.tier * tierP +
+          w.recency * recency +
+          w.entity * entity;
+      }
+
       return {
         ...m,
         decay_score: decay,
@@ -170,6 +249,7 @@ export function rankForRecall(
           tier: tierP,
           recency,
           entity,
+          cosine,
         },
       };
     })
@@ -184,3 +264,5 @@ export function isLowInformation(content: string): boolean {
   if (tokenize(t).length < 2) return true;
   return false;
 }
+
+export { RECALL_TIER_PRIOR };

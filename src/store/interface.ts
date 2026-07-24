@@ -41,5 +41,12 @@ export interface MemoryStore {
   getMeta(key: string): string | null;
   setMeta(key: string, value: string): void;
 
+  /** Entity → count of active memories in namespace (for rarity scoring). */
+  entityFrequency(namespace: string, limit?: number): Promise<Map<string, number>>;
+
+  dbFileSizeBytes(): number;
+  vacuum(): void;
+  listArchived(limit?: number): Promise<Memory[]>;
+
   close(): void;
 }

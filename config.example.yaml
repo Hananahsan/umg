@@ -1,4 +1,4 @@
-# Unified Memory Gateway — example config
+# Unified Memory Gateway v0.2 — example config
 # Copy to ~/.umg/config.yaml or ./umg.config.yaml
 
 db_path: "~/.umg/memory.db"
@@ -18,6 +18,14 @@ recall:
   default_limit: 8
   max_limit: 25
   min_score: 0.08
+  # Weights should sum ≈ 1.0 (warn only if not)
+  ranking_weights:
+    fts: 0.32
+    importance: 0.18
+    decay: 0.18
+    tier: 0.08
+    recency: 0.08
+    entity: 0.16
 
 consolidation:
   merge_threshold: 0.82
@@ -30,6 +38,10 @@ consolidation:
   promote_min_recalls: 3
   promote_min_sessions: 2
   archive_sources_on_promote: true
+  promote_min_avg_importance: 0.55
+  promote_min_skill_chars: 80
+  promote_dry_run_proposed: false
+  supersede_min_confidence: 0.75
   evict_procedural: false
   half_lives_days:
     working: 0.5
@@ -42,6 +54,31 @@ consolidation:
     semantic: 1000
     procedural: 200
     global: 2000
+  decay:
+    alpha: 0.65
+    beta: 0.35
+    access_saturation: 5
+    procedural_access_saturation: 12
+    session_boost: 0.15
+    session_boost_half_life_hours: 4
+
+sqlite:
+  busy_timeout_ms: 5000
+  size_warn_bytes: 52428800 # 50 MB soft warn in stats
+
+namespace:
+  # When true, recall defaults to default_namespace if omitted (project isolation)
+  hard_isolation: false
+
+# Optional hybrid path — OFF by default. FTS remains primary offline path.
+embeddings:
+  enabled: false
+  provider: "openai_compatible"
+  model: "text-embedding-3-small"
+  api_key_env: "UMG_EMBEDDING_API_KEY"
+  base_url: null
+  hybrid_fts_weight: 0.55
+  hybrid_cosine_weight: 0.25
 
 reflect:
   max_extract: 5
@@ -56,3 +93,4 @@ reflect:
 observability:
   event_log: true
   max_events: 10000
+  metrics_window_days: 7

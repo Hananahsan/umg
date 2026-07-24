@@ -2,7 +2,19 @@ import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
-import type { MemoryTier } from "./types.js";
+import type { MemoryTier, RankingWeights } from "./types.js";
+import { log } from "./util/log.js";
+
+export type { RankingWeights };
+
+export interface DecayConfig {
+  alpha: number;
+  beta: number;
+  access_saturation: number;
+  procedural_access_saturation: number;
+  session_boost: number;
+  session_boost_half_life_hours: number;
+}
 
 export interface UmgConfig {
   db_path: string;
@@ -17,10 +29,10 @@ export interface UmgConfig {
     default_limit: number;
     max_limit: number;
     min_score: number;
+    ranking_weights: RankingWeights;
   };
   consolidation: {
     merge_threshold: number;
-    /** Full-prune merge/supersede passes (bounded). */
     merge_max_passes: number;
     light_prune_every_n_writes: number;
     eviction_floor: number;
@@ -30,13 +42,30 @@ export interface UmgConfig {
     promote_min_recalls: number;
     promote_min_sessions: number;
     archive_sources_on_promote: boolean;
-    /**
-     * When false (default): procedural never score-floor or global-cap evicted,
-     * and tier-cap excess is skipped (skills protected).
-     */
+    promote_min_avg_importance: number;
+    promote_min_skill_chars: number;
+    promote_dry_run_proposed: boolean;
+    supersede_min_confidence: number;
     evict_procedural: boolean;
     half_lives_days: Record<MemoryTier, number>;
     caps: Record<MemoryTier | "global", number>;
+    decay: DecayConfig;
+  };
+  sqlite: {
+    busy_timeout_ms: number;
+    size_warn_bytes: number;
+  };
+  namespace: {
+    hard_isolation: boolean;
+  };
+  embeddings: {
+    enabled: boolean;
+    provider: string;
+    model: string;
+    api_key_env: string;
+    base_url: string | null;
+    hybrid_fts_weight: number;
+    hybrid_cosine_weight: number;
   };
   reflect: {
     max_extract: number;
@@ -52,8 +81,18 @@ export interface UmgConfig {
   observability: {
     event_log: boolean;
     max_events: number;
+    metrics_window_days: number;
   };
 }
+
+export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
+  fts: 0.32,
+  importance: 0.18,
+  decay: 0.18,
+  tier: 0.08,
+  recency: 0.08,
+  entity: 0.16,
+};
 
 const DEFAULTS: UmgConfig = {
   db_path: "~/.umg/memory.db",
@@ -73,6 +112,7 @@ const DEFAULTS: UmgConfig = {
     default_limit: 8,
     max_limit: 25,
     min_score: 0.08,
+    ranking_weights: { ...DEFAULT_RANKING_WEIGHTS },
   },
   consolidation: {
     merge_threshold: 0.82,
@@ -85,6 +125,10 @@ const DEFAULTS: UmgConfig = {
     promote_min_recalls: 3,
     promote_min_sessions: 2,
     archive_sources_on_promote: true,
+    promote_min_avg_importance: 0.55,
+    promote_min_skill_chars: 80,
+    promote_dry_run_proposed: false,
+    supersede_min_confidence: 0.75,
     evict_procedural: false,
     half_lives_days: {
       working: 0.5,
@@ -99,6 +143,30 @@ const DEFAULTS: UmgConfig = {
       procedural: 200,
       global: 2000,
     },
+    decay: {
+      alpha: 0.65,
+      beta: 0.35,
+      access_saturation: 5,
+      procedural_access_saturation: 12,
+      session_boost: 0.15,
+      session_boost_half_life_hours: 4,
+    },
+  },
+  sqlite: {
+    busy_timeout_ms: 5000,
+    size_warn_bytes: 52_428_800,
+  },
+  namespace: {
+    hard_isolation: false,
+  },
+  embeddings: {
+    enabled: false,
+    provider: "openai_compatible",
+    model: "text-embedding-3-small",
+    api_key_env: "UMG_EMBEDDING_API_KEY",
+    base_url: null,
+    hybrid_fts_weight: 0.55,
+    hybrid_cosine_weight: 0.25,
   },
   reflect: {
     max_extract: 5,
@@ -114,6 +182,7 @@ const DEFAULTS: UmgConfig = {
   observability: {
     event_log: true,
     max_events: 10_000,
+    metrics_window_days: 7,
   },
 };
 
@@ -147,6 +216,17 @@ function deepMerge<T extends Record<string, unknown>>(base: T, over: Partial<T>)
   return out;
 }
 
+function validateRankingWeights(w: RankingWeights): void {
+  const sum =
+    w.fts + w.importance + w.decay + w.tier + w.recency + w.entity;
+  if (Math.abs(sum - 1.0) > 0.02) {
+    log.warn("ranking_weights sum is not ~1.0 (continuing anyway)", {
+      sum,
+      weights: w,
+    });
+  }
+}
+
 function applyEnv(cfg: UmgConfig): UmgConfig {
   const next = { ...cfg };
   if (process.env.UMG_DB_PATH) next.db_path = process.env.UMG_DB_PATH;
@@ -175,6 +255,15 @@ function applyEnv(cfg: UmgConfig): UmgConfig {
       llm: { ...next.reflect.llm, base_url: process.env.UMG_LLM_BASE_URL },
     };
   }
+  if (
+    process.env.UMG_EMBEDDINGS_ENABLED === "1" ||
+    process.env.UMG_EMBEDDINGS_ENABLED === "true"
+  ) {
+    next.embeddings = { ...next.embeddings, enabled: true };
+  }
+  if (process.env.UMG_HARD_ISOLATION === "1" || process.env.UMG_HARD_ISOLATION === "true") {
+    next.namespace = { ...next.namespace, hard_isolation: true };
+  }
   return next;
 }
 
@@ -195,25 +284,46 @@ function findConfigPath(explicit?: string): string | null {
   return null;
 }
 
+/** Accept consolidation.ranking_weights as alias for recall.ranking_weights. */
+function applyRankingAlias(fileCfg: Record<string, unknown>, cfg: UmgConfig): UmgConfig {
+  const cons = fileCfg.consolidation as Record<string, unknown> | undefined;
+  const recall = fileCfg.recall as Record<string, unknown> | undefined;
+  if (cons?.ranking_weights && !recall?.ranking_weights) {
+    cfg.recall = {
+      ...cfg.recall,
+      ranking_weights: {
+        ...cfg.recall.ranking_weights,
+        ...(cons.ranking_weights as RankingWeights),
+      },
+    };
+  }
+  return cfg;
+}
+
 export function loadConfig(options?: {
   configPath?: string;
   dbPath?: string;
 }): UmgConfig {
   const path = findConfigPath(options?.configPath);
-  let fileCfg: Partial<UmgConfig> = {};
+  let fileCfg: Record<string, unknown> = {};
   if (path) {
     const raw = readFileSync(path, "utf8");
-    fileCfg = (parseYaml(raw) as Partial<UmgConfig>) ?? {};
+    fileCfg = (parseYaml(raw) as Record<string, unknown>) ?? {};
   }
-  let cfg = deepMerge(DEFAULTS as unknown as Record<string, unknown>, fileCfg as Record<string, unknown>) as unknown as UmgConfig;
+  let cfg = deepMerge(
+    DEFAULTS as unknown as Record<string, unknown>,
+    fileCfg,
+  ) as unknown as UmgConfig;
+  cfg = applyRankingAlias(fileCfg, cfg);
   cfg = applyEnv(cfg);
   if (options?.dbPath) cfg.db_path = options.dbPath;
   cfg.db_path = resolve(expandHome(cfg.db_path));
+  validateRankingWeights(cfg.recall.ranking_weights);
   return cfg;
 }
 
-/** Ensure parent directory for the DB exists. */
 export function ensureDbDir(dbPath: string): void {
+  if (dbPath === ":memory:") return;
   const dir = dirname(dbPath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });

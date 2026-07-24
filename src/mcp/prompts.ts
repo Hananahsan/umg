@@ -1,62 +1,69 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-const MEMORY_USAGE = `You have UMG (Unified Memory Gateway) tools for durable hierarchical memory.
+const MEMORY_USAGE = `You have UMG (Unified Memory Gateway) — hierarchical, hygiene-first local memory.
 
 ## Hierarchy
-- working: short-lived task scratch (expires fast)
-- episodic: specific events / session experiences
+- working: short-lived task scratch
+- episodic: specific events / experiences
 - semantic: durable facts, preferences, decisions
-- procedural: reusable skills / how-to lessons
+- procedural: reusable skills (promote only when proven)
 
-## When to call tools
-1. Session start → recall(query: project + task). Prefer semantic + procedural.
-2. New durable fact → retain(content, tier when sure, namespace project:<name>).
-3. Corrections → retain the new truth; UMG supersedes contradictory priors.
-4. Session end → reflect(text: bullet decisions/preferences, auto_retain: true).
-5. Proven playbook → promote_to_skill(memory_ids).
-6. Noisy store → prune(dry_run: true) then prune().
+## Ranking (how recall works)
+Recall ranks by: FTS + importance + decay + tier + recency + **entity overlap**.
+Name entities (products, services, people) in queries to surface the right memories.
+Weights are configurable offline — no embeddings required by default.
 
-## Writing good memories
-- One fact per retain
-- Concrete, reusable wording
-- Include entity names (services, projects)
-- Never store secrets (API keys, tokens, passwords)
-- Do not dump full transcripts into retain — use reflect
+## Write policy (additive-first)
+- retain durable facts immediately (semantic when sure)
+- Near-duplicates merge; clear contradictions supersede (confidence ≥ 0.75)
+- Ambiguous conflicts: both kept until prune consolidates — do not fear dual short-term facts
+- Never dump full transcripts — use reflect
 
-## Namespaces
-- project:<name> for project facts
-- global (default) for personal preferences
+## Session flow
+1. Start → recall(project + task); prefer semantic + procedural
+2. During → retain corrections and decisions
+3. End → reflect with bullets of decisions/preferences (auto_retain true)
+4. Proven playbook → promote_to_skill (dry_run first if unsure)
+5. Noise → prune(dry_run: true) then prune()
+
+## Hygiene
+- One fact per retain when possible
+- No secrets (keys, tokens, passwords)
+- Prefer lean semantic/procedural over endless episodic dumps
 `;
 
-const SESSION_START = `At the start of this session:
-1. Call recall with the project name and current task.
-2. Briefly apply relevant preferences and prior decisions.
-3. Do not re-ask for facts already in memory unless they may have changed.
+const SESSION_START = `Load UMG memory for this session:
+
+1. Call recall with: project name + current task (+ key entity names).
+2. Apply preferences and prior decisions without re-asking.
+3. If hard isolation is on, pass the project namespace explicitly.
+4. Keep working-tier scratch out of long-term stores unless durable.
+
+Do not re-explain known stack/preferences if recall returns them.
 `;
 
-const SESSION_END = `At the end of this session (or when asked to wrap up):
-1. Draft 3–8 bullets: decisions, preferences, corrections, durable lessons.
-2. Call reflect with that text and auto_retain: true.
-3. If a reusable procedure emerged, promote_to_skill on the key memory ids.
-4. Optionally prune(dry_run: true) if you stored a lot of noise.
+const SESSION_END = `Write back durable memory before ending:
+
+1. List 3–8 bullets: decisions, preferences, corrections, lessons (with entity names).
+2. Call reflect(text, auto_retain: true). Prefer labeled lines:
+   Decision: ...
+   Preference: ...
+3. If a reusable procedure emerged, promote_to_skill (or dry_run first).
+4. If you stored a lot of noise, prune(dry_run: true) then prune().
+
+Quality bar: only durable, reusable facts — not chat filler.
 `;
 
-/**
- * MCP prompts — portable agent guidance (Claude Code / Cursor can surface these).
- */
 export function registerPrompts(server: McpServer): void {
   server.prompt(
     "memory-usage",
-    "How to use UMG hierarchical memory tools effectively",
+    "How to use UMG hierarchical memory (hygiene-first, entity-aware recall)",
     async () => ({
       messages: [
         {
           role: "user",
-          content: {
-            type: "text",
-            text: MEMORY_USAGE,
-          },
+          content: { type: "text", text: MEMORY_USAGE },
         },
       ],
     }),
@@ -64,10 +71,10 @@ export function registerPrompts(server: McpServer): void {
 
   server.prompt(
     "session-start",
-    "Checklist for loading UMG memory at session start",
+    "Load UMG memory at session start (entity-aware recall)",
     {
-      project: z.string().optional().describe("Project or namespace hint"),
-      task: z.string().optional().describe("Current task summary"),
+      project: z.string().optional().describe("Project or namespace"),
+      task: z.string().optional().describe("Current task"),
     },
     async (args) => {
       const project = args.project ?? "current project";
@@ -80,7 +87,7 @@ export function registerPrompts(server: McpServer): void {
               type: "text",
               text:
                 SESSION_START +
-                `\nContext:\n- project: ${project}\n- task: ${task}\n\nSuggested recall query: "${project} ${task}"`,
+                `\nContext:\n- project: ${project}\n- task: ${task}\n\nSuggested recall: "${project} ${task}"\nNamespace hint: project:${project.replace(/\s+/g, "-").toLowerCase()}`,
             },
           },
         ],
@@ -90,12 +97,9 @@ export function registerPrompts(server: McpServer): void {
 
   server.prompt(
     "session-end",
-    "Checklist for reflecting and writing back durable memories at session end",
+    "Reflect and write durable memories at session end",
     {
-      notes: z
-        .string()
-        .optional()
-        .describe("Optional session notes to include in the prompt"),
+      notes: z.string().optional().describe("Session notes to consider"),
     },
     async (args) => ({
       messages: [
@@ -105,9 +109,7 @@ export function registerPrompts(server: McpServer): void {
             type: "text",
             text:
               SESSION_END +
-              (args.notes
-                ? `\n\nSession notes to consider:\n${args.notes}`
-                : ""),
+              (args.notes ? `\n\nSession notes:\n${args.notes}` : ""),
           },
         },
       ],
