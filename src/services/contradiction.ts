@@ -193,9 +193,94 @@ export function detectContradiction(
 }
 
 /**
- * Whether two similar memories should merge (same fact) vs supersede (conflict).
- * High similarity without contradiction → merge.
- * Medium/high topic overlap with contradiction → supersede.
+ * Write / prune conflict policy (v0.1.2 — additive-first, Mem0-inspired).
+ *
+ * Prefer ADD + later consolidation over aggressive in-place supersede when
+ * confidence is only medium. Clear conflicts may still supersede.
+ *
+ * | Case                         | Action     |
+ * |------------------------------|------------|
+ * | No contradiction             | none       |
+ * | Contradiction, not related   | none       |
+ * | Clear + related conflict     | supersede  |
+ * | Ambiguous related conflict   | defer      |
+ *
+ * "defer" means: insert the new memory, leave the prior active, let prune
+ * multi-pass merge/supersede clean up later if the conflict becomes clear.
+ */
+export type WriteConflictAction = "none" | "supersede" | "defer";
+
+export interface WriteConflictResolution extends ContradictionResult {
+  action: WriteConflictAction;
+  /** @deprecated use action === "supersede"; kept for call-site compatibility */
+  supersede: boolean;
+}
+
+function isClearContradiction(
+  c: ContradictionResult,
+  similarityScore: number,
+  mergeThreshold: number,
+): boolean {
+  if (!c.contradicts || !c.reason) return false;
+  const reason = c.reason;
+
+  // Strong structural conflicts
+  if (reason.startsWith("conflicting_values") || reason === "boolean_flip") {
+    return (
+      similarityScore >= mergeThreshold * 0.65 || c.topic_overlap >= 0.4
+    );
+  }
+
+  if (reason === "negation_polarity") {
+    return (
+      c.topic_overlap >= 0.45 && similarityScore >= mergeThreshold * 0.5
+    );
+  }
+
+  if (reason === "correction_language") {
+    return (
+      c.topic_overlap >= 0.4 && similarityScore >= mergeThreshold * 0.5
+    );
+  }
+
+  return false;
+}
+
+function isRelated(
+  c: ContradictionResult,
+  similarityScore: number,
+  mergeThreshold: number,
+): boolean {
+  return (
+    similarityScore >= mergeThreshold * 0.55 || c.topic_overlap >= 0.28
+  );
+}
+
+/**
+ * Resolve whether to supersede, defer (add both), or ignore for write path.
+ */
+export function resolveWriteConflict(
+  incoming: string,
+  existing: string,
+  similarityScore: number,
+  mergeThreshold: number,
+): WriteConflictResolution {
+  const c = detectContradiction(incoming, existing);
+  if (!c.contradicts) {
+    return { ...c, action: "none", supersede: false };
+  }
+  if (!isRelated(c, similarityScore, mergeThreshold)) {
+    return { ...c, action: "none", supersede: false };
+  }
+  if (isClearContradiction(c, similarityScore, mergeThreshold)) {
+    return { ...c, action: "supersede", supersede: true };
+  }
+  // Ambiguous: additive-first
+  return { ...c, action: "defer", supersede: false };
+}
+
+/**
+ * @deprecated Prefer resolveWriteConflict. Returns supersede=true only for CLEAR conflicts.
  */
 export function shouldSupersede(
   incoming: string,
@@ -203,12 +288,16 @@ export function shouldSupersede(
   similarityScore: number,
   mergeThreshold: number,
 ): ContradictionResult & { supersede: boolean } {
-  const c = detectContradiction(incoming, existing);
-  if (!c.contradicts) {
-    return { ...c, supersede: false };
-  }
-  // Only supersede when they're related enough (similarity or topic)
-  const related =
-    similarityScore >= mergeThreshold * 0.55 || c.topic_overlap >= 0.28;
-  return { ...c, supersede: related };
+  const r = resolveWriteConflict(
+    incoming,
+    existing,
+    similarityScore,
+    mergeThreshold,
+  );
+  return {
+    contradicts: r.contradicts,
+    reason: r.reason,
+    topic_overlap: r.topic_overlap,
+    supersede: r.action === "supersede",
+  };
 }

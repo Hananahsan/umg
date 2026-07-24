@@ -115,4 +115,89 @@ describe("pruning and decay", () => {
     const m = await app.store.get(r.id!);
     expect(m?.status).toBe("archived");
   });
+
+  it("multi-pass merge consolidates near-duplicates", async () => {
+    const ns = "multipass";
+    // Three near-identical facts that should collapse under multi-pass
+    await app.memory.retain({
+      content: "The staging API base URL is https://staging.example.com/v1 for clients.",
+      tier: "semantic",
+      importance: 0.8,
+      namespace: ns,
+      skip_merge: true,
+    });
+    await app.memory.retain({
+      content: "The staging API base URL is https://staging.example.com/v1 for all clients.",
+      tier: "semantic",
+      importance: 0.8,
+      namespace: ns,
+      skip_merge: true,
+    });
+    await app.memory.retain({
+      content: "Staging API base URL is https://staging.example.com/v1 for clients.",
+      tier: "semantic",
+      importance: 0.8,
+      namespace: ns,
+      skip_merge: true,
+    });
+
+    const before = await app.memory.list({ namespace: ns, tiers: ["semantic"] });
+    expect(before.length).toBe(3);
+
+    const result = await app.consolidation.prune({ namespace: ns });
+    const after = await app.memory.list({ namespace: ns, tiers: ["semantic"] });
+
+    expect(result.merged + result.archived).toBeGreaterThan(0);
+    expect(after.length).toBeLessThan(before.length);
+    const mergeDetails = result.details.filter((d) => d.action === "merge");
+    if (mergeDetails.length > 0) {
+      expect(mergeDetails[0].reason).toBe("near_duplicate");
+      expect(mergeDetails[0].pass).toBeDefined();
+    }
+  });
+
+  it("does not score-floor evict procedural when protected", async () => {
+    const r = await app.memory.retain({
+      content:
+        "Skill: deploy checklist\nWhen to use: production deploys\nLessons:\n1. Run migrations first.",
+      tier: "procedural",
+      importance: 0.9,
+      namespace: "proc-prot",
+      skip_merge: true,
+    });
+    await app.store.update(r.id!, {
+      decay_score: 0.01,
+      last_accessed_at: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    app.cfg.consolidation.evict_procedural = false;
+    app.cfg.consolidation.eviction_floor = 0.5;
+    app.cfg.consolidation.grace_period_days = 0;
+
+    await app.consolidation.prune({ namespace: "proc-prot" });
+    const m = await app.store.get(r.id!);
+    expect(m?.status).toBe("active");
+  });
+
+  it("includes stable reason codes on cap eviction details", async () => {
+    // Keep decay above score floor so only tier-cap eviction fires
+    app.cfg.consolidation.eviction_floor = 0.05;
+    for (let i = 0; i < 12; i++) {
+      await app.memory.retain({
+        content: `Working scratch UNIQUE_TOKEN_${i}_${"x".repeat(8 + i)} xyz${i} abc${i * 7} task-${i}-context.`,
+        tier: "working",
+        importance: 0.9,
+        namespace: "reason-ns",
+        skip_merge: true,
+      });
+    }
+    const result = await app.consolidation.prune({ namespace: "reason-ns" });
+    const after = await app.memory.list({
+      namespace: "reason-ns",
+      tiers: ["working"],
+    });
+    expect(after.length).toBeLessThanOrEqual(app.cfg.consolidation.caps.working);
+    const cap = result.details.find((d) => d.action === "evict_cap");
+    expect(cap).toBeTruthy();
+    expect(cap?.reason).toBe("cap_tier");
+  });
 });

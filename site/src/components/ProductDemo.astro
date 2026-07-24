@@ -1,0 +1,169 @@
+---
+const tiers = [
+  {
+    name: "working",
+    purpose: "Current task scratch",
+    meta: "24h · cap 50",
+    active: false,
+  },
+  {
+    name: "episodic",
+    purpose: "Specific interactions",
+    meta: "30d · cap 500",
+    active: false,
+  },
+  {
+    name: "semantic",
+    purpose: "Facts, prefs, decisions",
+    meta: "365d · cap 1000",
+    active: true,
+  },
+  {
+    name: "procedural",
+    purpose: "Skills & lessons",
+    meta: "near-immortal · cap 200",
+    active: false,
+  },
+];
+
+const memories = [
+  {
+    tier: "semantic",
+    content: "Brand accent is soft violet #C4B5FD",
+    score: "0.91",
+  },
+  {
+    tier: "semantic",
+    content: "Prefer TypeScript strict mode across the monorepo",
+    score: "0.87",
+  },
+  {
+    tier: "procedural",
+    content: "Always dry-run prune before destructive eviction",
+    score: "0.94",
+  },
+  {
+    tier: "episodic",
+    content: "Landing page copy review — omit Login until auth exists",
+    score: "0.62",
+  },
+];
+---
+
+<section class="section-pad border-t border-border bg-bg-elevated/40" id="product" aria-labelledby="product-heading">
+  <div class="container-content">
+    <div class="grid items-start gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
+      <div>
+        <p class="eyebrow mb-4">Product</p>
+        <h2
+          id="product-heading"
+          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text text-balance"
+        >
+          Hierarchical memory, not a bigger bag.
+        </h2>
+        <p class="mt-5 text-base leading-relaxed text-text-muted">
+          Every memory has a tier, importance, decay score, and lifecycle.
+          Recall re-ranks with FTS, importance, recency, and tier priors — then
+          consolidation keeps the store sharp.
+        </p>
+
+        <ul class="mt-8 space-y-3">
+          {
+            [
+              "Auto-tier on write, or set tier explicitly",
+              "Merge similar facts; supersede contradictions",
+              "Promote repeated patterns into procedural skills",
+              "Namespace isolation for projects and personal prefs",
+            ].map((line) => (
+              <li class="flex items-start gap-3 text-sm text-text-muted">
+                <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent" />
+                <span>{line}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <!-- Dashboard mock -->
+      <div class="code-window">
+        <div
+          class="flex items-center justify-between border-b border-border px-4 py-3"
+        >
+          <div class="flex items-center gap-3">
+            <span class="font-display text-sm font-semibold">Nura</span>
+            <span
+              class="rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] text-text-faint"
+              >namespace · global</span
+            >
+          </div>
+          <span class="flex items-center gap-1.5 text-xs text-text-faint">
+            <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
+            local sqlite
+          </span>
+        </div>
+
+        <div class="grid border-b border-border sm:grid-cols-4">
+          {
+            tiers.map((tier) => (
+              <div
+                class:list={[
+                  "border-b border-border px-3 py-3 sm:border-b-0 sm:border-r sm:last:border-r-0",
+                  tier.active && "bg-accent-dim/40",
+                ]}
+              >
+                <p
+                  class:list={[
+                    "font-mono text-[0.6875rem]",
+                    tier.active ? "text-accent" : "text-text-faint",
+                  ]}
+                >
+                  {tier.name}
+                </p>
+                <p class="mt-1 text-xs text-text-muted">{tier.purpose}</p>
+                <p class="mt-1 font-mono text-[0.625rem] text-text-faint">
+                  {tier.meta}
+                </p>
+              </div>
+            ))
+          }
+        </div>
+
+        <div class="p-2 sm:p-3">
+          <div
+            class="mb-2 flex items-center justify-between px-2 py-1 text-[0.625rem] uppercase tracking-wider text-text-faint"
+          >
+            <span>Active memories</span>
+            <span>score</span>
+          </div>
+          <ul class="space-y-1">
+            {
+              memories.map((m) => (
+                <li class="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
+                  <div class="min-w-0">
+                    <span class="font-mono text-[0.625rem] text-accent/80">
+                      {m.tier}
+                    </span>
+                    <p class="mt-0.5 truncate text-sm text-text">{m.content}</p>
+                  </div>
+                  <span class="shrink-0 font-mono text-xs text-text-faint">
+                    {m.score}
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+
+        <div
+          class="flex flex-wrap gap-2 border-t border-border px-4 py-3 font-mono text-[0.6875rem] text-text-faint"
+        >
+          <span class="rounded bg-white/[0.04] px-2 py-1">retain</span>
+          <span class="rounded bg-white/[0.04] px-2 py-1">recall</span>
+          <span class="rounded bg-white/[0.04] px-2 py-1">reflect</span>
+          <span class="rounded bg-white/[0.04] px-2 py-1">prune</span>
+          <span class="rounded bg-white/[0.04] px-2 py-1">promote</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -3,8 +3,14 @@ import type { MemoryStore } from "../store/interface.js";
 import type { MemoryService } from "./memory.js";
 import type { Memory, PromoteResult } from "../types.js";
 import { emitEvent } from "../observability/events.js";
+import {
+  setIntersectionSize,
+  setJaccard,
+} from "../util/entities.js";
 import { summarize, uniqueStrings } from "../util/text.js";
 import { log } from "../util/log.js";
+
+const SKIP_TAGS = new Set(["skill", "auto-promoted", "procedural"]);
 
 export class PromotionService {
   constructor(
@@ -89,7 +95,10 @@ export class PromotionService {
       result.memory.id,
     );
 
-    log.info("promoted to skill", { id: result.memory.id, sources: sources.length });
+    log.info("promoted to skill", {
+      id: result.memory.id,
+      sources: sources.length,
+    });
 
     return {
       id: result.memory.id,
@@ -100,8 +109,8 @@ export class PromotionService {
   }
 
   /**
-   * Auto-promote: entity/tag clusters with enough access across sessions.
-   * Deterministic and conservative.
+   * Auto-promote via entity/tag set clustering (conservative).
+   * Requires ≥2 members in a cluster — no single-memory auto skills.
    */
   async autoPromote(namespace?: string): Promise<PromoteResult[]> {
     const minRecalls = this.cfg.consolidation.promote_min_recalls;
@@ -116,58 +125,141 @@ export class PromotionService {
       order_dir: "desc",
     });
 
-    // Group by primary entity or first tag
-    const groups = new Map<string, Memory[]>();
-    for (const m of candidates) {
-      if (m.access_count < minRecalls) continue;
-      const key =
-        m.entities[0]?.toLowerCase() ||
-        m.tags.find((t) => t !== "skill")?.toLowerCase() ||
-        null;
-      if (!key) continue;
-      const list = groups.get(key) ?? [];
-      list.push(m);
-      groups.set(key, list);
-    }
+    const eligible = candidates.filter((m) => {
+      if (m.access_count < 1) return false;
+      if (m.tier === "semantic" && m.importance < 0.5) return false;
+      if (m.tier === "episodic" && m.importance < 0.45) return false;
+      const ents = cleanEntities(m);
+      const tags = cleanTags(m);
+      return ents.length > 0 || tags.length > 0;
+    });
 
+    const clusters = clusterMemories(eligible);
     const results: PromoteResult[] = [];
-    for (const [key, mems] of groups) {
+
+    for (const cluster of clusters) {
+      if (cluster.length < 2) continue;
+
+      const totalAccess = cluster.reduce((a, m) => a + m.access_count, 0);
+      if (totalAccess < minRecalls) continue;
+
       const sessions = new Set(
-        mems.map((m) => m.session_id).filter(Boolean) as string[],
+        cluster.map((m) => m.session_id).filter(Boolean) as string[],
       );
-      // If no session_ids, require enough members instead
       const sessionOk =
         sessions.size >= minSessions ||
-        (sessions.size === 0 && mems.length >= minSessions);
-      const recallOk = mems.reduce((a, m) => a + m.access_count, 0) >= minRecalls;
-      if (!sessionOk || !recallOk) continue;
+        (sessions.size === 0 && cluster.length >= minSessions);
+      if (!sessionOk) continue;
 
-      // Skip if procedural skill already exists for this key
+      const label = clusterLabel(cluster);
+      if (!label) continue;
+
       const existing = await this.store.search({
-        text: key,
-        namespace: mems[0].namespace,
+        text: label,
+        namespace: cluster[0].namespace,
         tiers: ["procedural"],
         limit: 3,
       });
-      if (existing.some((e) => e.content.toLowerCase().includes(key))) {
+      if (existing.some((e) => e.content.toLowerCase().includes(label))) {
         continue;
       }
 
+      // Prefer highest-access members
+      const ranked = [...cluster].sort(
+        (a, b) => b.access_count - a.access_count || b.importance - a.importance,
+      );
+
       try {
         const promo = await this.promoteToSkill({
-          memory_ids: mems.slice(0, 5).map((m) => m.id),
-          title: `Skill: ${key}`,
-          tags: [key, "auto-promoted"],
-          namespace: mems[0].namespace,
+          memory_ids: ranked.slice(0, 5).map((m) => m.id),
+          title: `Skill: ${label}`,
+          tags: [label, "auto-promoted"],
+          namespace: cluster[0].namespace,
         });
         results.push(promo);
       } catch (err) {
-        log.warn("auto-promote group failed", { key, error: String(err) });
+        log.warn("auto-promote group failed", { label, error: String(err) });
       }
     }
 
     return results;
   }
+}
+
+function cleanEntities(m: Memory): string[] {
+  return uniqueStrings(m.entities.map((e) => e.trim()).filter(Boolean));
+}
+
+function cleanTags(m: Memory): string[] {
+  return uniqueStrings(
+    m.tags
+      .map((t) => t.trim())
+      .filter((t) => t && !SKIP_TAGS.has(t.toLowerCase())),
+  );
+}
+
+/**
+ * Greedy clustering: attach to first compatible cluster, else new cluster.
+ * Compatible if entity Jaccard ≥ 0.5, or |entity ∩| ≥ 2, or
+ * (tag Jaccard ≥ 0.5 and ≥1 shared entity).
+ */
+export function clusterMemories(memories: Memory[]): Memory[][] {
+  const clusters: Memory[][] = [];
+
+  for (const m of memories) {
+    let placed = false;
+    for (const c of clusters) {
+      if (c.some((other) => memoriesRelated(m, other))) {
+        c.push(m);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) clusters.push([m]);
+  }
+
+  return clusters;
+}
+
+export function memoriesRelated(a: Memory, b: Memory): boolean {
+  const ea = cleanEntities(a);
+  const eb = cleanEntities(b);
+  const ta = cleanTags(a);
+  const tb = cleanTags(b);
+
+  if (setJaccard(ea, eb) >= 0.5) return true;
+  if (setIntersectionSize(ea, eb) >= 2) return true;
+  if (setJaccard(ta, tb) >= 0.5 && setIntersectionSize(ea, eb) >= 1) {
+    return true;
+  }
+  return false;
+}
+
+function clusterLabel(cluster: Memory[]): string | null {
+  const counts = new Map<string, number>();
+  for (const m of cluster) {
+    for (const e of cleanEntities(m)) {
+      const k = e.toLowerCase();
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+  }
+  if (counts.size === 0) {
+    for (const m of cluster) {
+      for (const t of cleanTags(m)) {
+        const k = t.toLowerCase();
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+      }
+    }
+  }
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [k, n] of counts) {
+    if (n > bestN) {
+      best = k;
+      bestN = n;
+    }
+  }
+  return best;
 }
 
 function formatSkillBody(title: string, sources: string[]): string {

@@ -1,0 +1,29 @@
+---
+const tools = [
+  "Claude Code",
+  "Cursor",
+  "MCP clients",
+  "Custom agents",
+  "CLI",
+  "stdio MCP",
+];
+---
+
+<section class="border-y border-border bg-bg-elevated" aria-label="Integrations">
+  <div class="container-content py-10 md:py-12">
+    <p class="text-center text-sm text-text-faint">
+      Works with the agents and tools you already use
+    </p>
+    <ul
+      class="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 md:gap-x-12"
+    >
+      {
+        tools.map((name) => (
+          <li class="text-sm font-medium tracking-tight text-text-muted">
+            {name}
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>

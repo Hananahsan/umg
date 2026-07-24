@@ -1,0 +1,33 @@
+---
+import { DOCS, GITHUB } from "../lib/links";
+---
+
+<section
+  class="relative section-pad overflow-hidden border-t border-border"
+  aria-labelledby="cta-heading"
+>
+  <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+    <div
+      class="absolute left-1/2 top-1/2 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/10 blur-[120px]"
+    >
+    </div>
+  </div>
+
+  <div class="container-content relative z-10 text-center">
+    <p class="eyebrow mb-4">Get started</p>
+    <h2
+      id="cta-heading"
+      class="font-display mx-auto max-w-2xl text-[clamp(1.875rem,4vw,2.75rem)] font-semibold tracking-[-0.03em] text-text text-balance"
+    >
+      Give your agents a memory that lasts.
+    </h2>
+    <p class="mx-auto mt-5 max-w-md text-base leading-relaxed text-text-muted">
+      Persistent. Hierarchical. Clean. Install locally and connect via MCP in
+      minutes.
+    </p>
+    <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+      <a href={DOCS} class="btn-primary">Start building</a>
+      <a href={GITHUB} class="btn-ghost">Star on GitHub</a>
+    </div>
+  </div>
+</section>

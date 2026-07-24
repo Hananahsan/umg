@@ -1,0 +1,28 @@
+---
+const stats = [
+  { value: "4", label: "Memory tiers", sub: "working → procedural" },
+  { value: "6", label: "MCP tools", sub: "retain to promote" },
+  { value: "Local", label: "Default backend", sub: "SQLite + FTS5" },
+  { value: "<5 min", label: "Time to first retain", sub: "install & connect" },
+];
+---
+
+<section class="section-pad border-b border-border" aria-label="At a glance">
+  <div class="container-content">
+    <dl class="grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-6">
+      {
+        stats.map((stat) => (
+          <div class="flex flex-col">
+            <dd class="font-display text-3xl font-semibold tracking-tight text-text md:text-4xl">
+              {stat.value}
+            </dd>
+            <dt class="mt-2 text-sm font-medium text-text">
+              {stat.label}
+            </dt>
+            <p class="mt-1 text-sm text-text-faint">{stat.sub}</p>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>

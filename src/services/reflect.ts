@@ -5,6 +5,7 @@ import type { MemoryTier, ReflectCandidate, ReflectResult, RetainResult } from "
 import { computeImportance, autoTier } from "./scoring.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
+import { extractEntities } from "../util/entities.js";
 import { jaccard, normalizeText, truncate, uniqueStrings } from "../util/text.js";
 
 export class ReflectService {
@@ -264,20 +265,6 @@ function tagsForReason(reason: string): string[] {
   if (reason.startsWith("labeled:")) return [reason.slice(8)];
   if (reason === "session_summary") return ["session-summary"];
   return [];
-}
-
-function extractEntities(content: string): string[] {
-  const entities: string[] = [];
-  // Capitalized multi-word or tech tokens
-  const caps = content.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g);
-  if (caps) entities.push(...caps);
-  const tech = content.match(
-    /\b(?:PostgreSQL|Postgres|Supabase|Next\.js|TypeScript|Python|Retell|Stripe|Redis|SQLite|OpenAI|Anthropic)\b/gi,
-  );
-  if (tech) entities.push(...tech);
-  const versions = content.match(/\bv?\d+\.\d+(?:\.\d+)?\b/g);
-  if (versions) entities.push(...versions);
-  return uniqueStrings(entities).slice(0, 8);
 }
 
 function summarizeSession(text: string): string | null {

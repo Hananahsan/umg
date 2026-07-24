@@ -1,0 +1,58 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Nura — The memory layer for AI agents",
+  description =
+    "Persistent hierarchical memory for AI agents. MCP-first, local-first. Retain, recall, reflect, and prune — built for Claude Code, Cursor, and any MCP client.",
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, "https://nura.dev");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#000000" />
+    <link rel="canonical" href={canonical} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="/images/hero-bg.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="preload"
+      href="/fonts/Avantt-Regular.otf"
+      as="font"
+      type="font/otf"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/Avantt-SemiBold.otf"
+      as="font"
+      type="font/otf"
+      crossorigin
+    />
+
+    <title>{title}</title>
+  </head>
+  <body class="relative overflow-x-hidden">
+    <div class="grain" aria-hidden="true"></div>
+    <slot />
+  </body>
+</html>

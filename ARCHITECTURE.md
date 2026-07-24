@@ -58,11 +58,15 @@ Search: SQLite **FTS5 BM25**, with LIKE + Jaccard fallback.
 ## Read path (`recall`)
 
 1. FTS (or LIKE) candidate set  
-2. Multi-factor re-rank:
+2. Multi-factor re-rank (v0.1.2 — entity boost, Mem0-inspired, no embeddings):
 
 ```
-score = 0.40·fts + 0.20·importance + 0.20·decay + 0.10·tier_prior + 0.10·recency
+score = 0.32·fts + 0.18·importance + 0.18·decay
+      + 0.08·tier_prior + 0.08·recency + 0.16·entity
 ```
+
+`entity` = fraction of query-extracted entities matched on `memory.entities[]`
+(content substring fallback when entities empty).
 
 3. Touch access_count / last_accessed_at  
 4. Emit observability event  
@@ -78,14 +82,20 @@ importance = clamp(tier_prior + boosts − penalties)
 Boosts: remember/prefer/decision language, corrections, entity-dense short facts.  
 Agent-supplied importance is soft-blended (70/30).
 
-### 2. Merge (+ contradiction supersede)
+### 2. Merge (+ additive-first contradiction policy)
 
 On write and full prune: Jaccard + FTS candidates.
 
 - **Merge** when similarity ≥ `merge_threshold` (default 0.82) and no contradiction.  
   Keep richer content, max importance, union tags/entities, lineage via `parent_ids`.
-- **Supersede** when heuristics detect a related contradiction (conflicting slot values, negation polarity, correction language).  
-  Archive the loser; winner stores `supersedes_id` + parent lineage. Prefer false negatives over wrong supersedes.
+- **Supersede** only on **clear** related contradictions (`conflicting_values`, `boolean_flip`,
+  or strong negation/correction with high topic overlap). Archive loser; set `supersedes_id`.
+- **Defer (additive-first)** on ambiguous conflicts: insert the new memory, leave prior active,
+  stamp `metadata.conflict_deferred`. Later multi-pass prune can merge or supersede when clear.
+- Full prune runs **up to `merge_max_passes` (default 3)** merge/supersede passes until a pass
+  makes no changes.
+
+Prefer false-negative supersede (temporary dual facts) over destroying a still-valid prior.
 
 ### 3. Decay
 
@@ -102,12 +112,13 @@ Procedural floor: 0.4.
 
 On prune:
 
-1. Hard `expires_at`  
-2. Score floor after grace period  
-3. Per-tier caps then global cap  
-4. Archive (default), purge archives older than retention  
+1. Hard `expires_at` (`reason: expired`)  
+2. Score floor after grace period (`reason: score_floor`) — **never** procedural when `evict_procedural: false`  
+3. Per-tier caps (`reason: cap_tier`) then global cap (`reason: cap_global`)  
+4. Procedural over tier cap with flag false → `cap_skip_procedural` (skills protected, no archive)  
+5. Archive (default), purge archives older than retention  
 
-Victims: lowest `decay_score`, then oldest access. Procedural protected unless configured.
+Victims: lowest `decay_score`, then oldest access.
 
 ## Promotion
 

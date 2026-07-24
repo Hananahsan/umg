@@ -20,6 +20,8 @@ export interface UmgConfig {
   };
   consolidation: {
     merge_threshold: number;
+    /** Full-prune merge/supersede passes (bounded). */
+    merge_max_passes: number;
     light_prune_every_n_writes: number;
     eviction_floor: number;
     archive_retention_days: number;
@@ -28,6 +30,10 @@ export interface UmgConfig {
     promote_min_recalls: number;
     promote_min_sessions: number;
     archive_sources_on_promote: boolean;
+    /**
+     * When false (default): procedural never score-floor or global-cap evicted,
+     * and tier-cap excess is skipped (skills protected).
+     */
     evict_procedural: boolean;
     half_lives_days: Record<MemoryTier, number>;
     caps: Record<MemoryTier | "global", number>;
@@ -70,6 +76,7 @@ const DEFAULTS: UmgConfig = {
   },
   consolidation: {
     merge_threshold: 0.82,
+    merge_max_passes: 3,
     light_prune_every_n_writes: 25,
     eviction_floor: 0.12,
     archive_retention_days: 90,

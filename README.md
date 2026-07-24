@@ -13,6 +13,9 @@ Think **“OpenRouter for agent memory”** — start with one excellent local b
 - **Promotion:** repeated patterns → procedural skills
 - **Local SQLite** + FTS5 search (fully offline by default)
 - **Opinionated pruning** with aggressive caps and score floors
+- **Entity-boosted recall** (local heuristics, no embeddings)
+- **Additive-first writes** with clear-only supersede
+- **Multi-pass merge** on full prune
 - **Optional LLM reflect** (OpenAI-compatible) behind a flag
 
 ## Quick start (< 5 minutes)
@@ -158,6 +161,14 @@ umg help
 ```bash
 npm test
 npm run e2e
+```
+
+## Marketing site (Nura)
+
+Product landing page lives in [`site/`](./site/) (Astro + Tailwind). Brand name: **Nura**.
+
+```bash
+cd site && npm install && npm run dev
 ```
 
 ## Architecture

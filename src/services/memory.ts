@@ -17,9 +17,10 @@ import {
   isLowInformation,
   rankForRecall,
 } from "./scoring.js";
-import { shouldSupersede } from "./contradiction.js";
+import { resolveWriteConflict } from "./contradiction.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
+import { extractEntities } from "../util/entities.js";
 import { nowIso, summarize, truncate, uniqueStrings } from "../util/text.js";
 import type { ConsolidationService } from "./consolidation.js";
 
@@ -102,8 +103,14 @@ export class MemoryService {
     const namespace = input.namespace ?? this.cfg.default_namespace;
     const now = nowIso();
 
-    // Merge / supersede on write
+    // Merge / supersede / defer on write (additive-first policy — see contradiction.ts)
     let supersedesId: string | null = null;
+    let deferredMeta: Record<string, unknown> | null = null;
+    const entities = uniqueStrings([
+      ...(input.entities ?? []),
+      ...extractEntities(body),
+    ]);
+
     if (!input.skip_merge) {
       const similar = await this.store.findSimilar(body, {
         namespace,
@@ -114,15 +121,15 @@ export class MemoryService {
       const threshold = this.cfg.consolidation.merge_threshold;
 
       if (best) {
-        const decision = shouldSupersede(
+        const decision = resolveWriteConflict(
           body,
           best.content,
           best.score,
           threshold,
         );
 
-        // Contradiction: keep newer claim, archive older, link lineage
-        if (decision.supersede) {
+        // CLEAR contradiction only: archive prior, link lineage
+        if (decision.action === "supersede") {
           supersedesId = best.id;
           await this.store.archive(best.id);
           await this.store.update(best.id, {
@@ -144,12 +151,33 @@ export class MemoryService {
             },
             best.id,
           );
+        } else if (decision.action === "defer") {
+          // AMBIGUOUS conflict: keep both; prune may resolve later
+          deferredMeta = {
+            conflict_deferred: true,
+            related_memory_id: best.id,
+            conflict_reason: decision.reason,
+            topic_overlap: decision.topic_overlap,
+          };
+          await emitEvent(
+            this.store,
+            this.cfg,
+            "retain",
+            {
+              reason: "conflict_deferred",
+              related_id: best.id,
+              contradiction: decision.reason,
+              preview: truncate(body, 100),
+            },
+            best.id,
+          );
         } else if (best.score >= threshold) {
+          // Near-duplicate, no contradiction → merge
           const merged = await this.mergeInto(best, {
             content: body,
             importance,
             tags: input.tags,
-            entities: input.entities,
+            entities,
             session_id: input.session_id,
             metadata: input.metadata,
             confidence: input.confidence,
@@ -163,6 +191,7 @@ export class MemoryService {
               into: merged.id,
               score: best.score,
               content_preview: truncate(body, 100),
+              reason: "near_duplicate",
             },
             merged.id,
           );
@@ -187,7 +216,7 @@ export class MemoryService {
       summary: summarize(body),
       namespace,
       tags: uniqueStrings(input.tags ?? []),
-      entities: uniqueStrings(input.entities ?? []),
+      entities,
       source: input.source ?? "agent",
       session_id: input.session_id ?? null,
       importance,
@@ -204,6 +233,7 @@ export class MemoryService {
         ...(supersedesId
           ? { supersede_reason: "contradiction", superseded_prior: supersedesId }
           : {}),
+        ...(deferredMeta ?? {}),
       },
       parent_ids: supersedesId ? [supersedesId] : [],
       supersedes_id: supersedesId,
@@ -330,10 +360,13 @@ export class MemoryService {
       status: "active",
     });
 
-    const ranked = rankForRecall(raw, this.cfg).slice(0, limit);
+    const now = nowIso();
+    const ranked = rankForRecall(raw, this.cfg, now, input.query).slice(
+      0,
+      limit,
+    );
 
     // Touch access (best-effort, rate-limited by store update)
-    const now = nowIso();
     for (const m of ranked) {
       try {
         await this.store.update(m.id, {

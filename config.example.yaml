@@ -21,6 +21,7 @@ recall:
 
 consolidation:
   merge_threshold: 0.82
+  merge_max_passes: 3
   light_prune_every_n_writes: 25
   eviction_floor: 0.12
   archive_retention_days: 90

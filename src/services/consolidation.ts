@@ -3,7 +3,7 @@ import type { MemoryStore } from "../store/interface.js";
 import type { Memory, MemoryTier, PruneResult } from "../types.js";
 import { MEMORY_TIERS } from "../types.js";
 import { computeDecayScore } from "./scoring.js";
-import { shouldSupersede } from "./contradiction.js";
+import { resolveWriteConflict } from "./contradiction.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { addDaysIso, nowIso, truncate, uniqueStrings } from "../util/text.js";
@@ -47,9 +47,13 @@ export class ConsolidationService {
     const mergeThreshold = aggressive
       ? Math.max(0.7, this.cfg.consolidation.merge_threshold - 0.05)
       : this.cfg.consolidation.merge_threshold;
+    const maxPasses = Math.max(
+      1,
+      this.cfg.consolidation.merge_max_passes ?? 3,
+    );
 
     // Load active memories (bounded)
-    const memories = await this.store.list({
+    let memories = await this.store.list({
       namespace: opts.namespace,
       status: "active",
       limit: 5000,
@@ -62,7 +66,13 @@ export class ConsolidationService {
       const ds = computeDecayScore(m, this.cfg, now);
       if (Math.abs(ds - m.decay_score) > 0.001) {
         decayed++;
-        details.push({ action: "decay", id: m.id, from: m.decay_score, to: ds });
+        details.push({
+          action: "decay",
+          reason: "recompute",
+          id: m.id,
+          from: m.decay_score,
+          to: ds,
+        });
         if (!dry) {
           await this.store.update(m.id, { decay_score: ds, updated_at: now });
           m.decay_score = ds;
@@ -74,95 +84,131 @@ export class ConsolidationService {
     for (const m of memories) {
       if (m.expires_at && m.expires_at < now) {
         archived++;
-        details.push({ action: "expire", id: m.id, expires_at: m.expires_at });
+        details.push({
+          action: "expire",
+          reason: "expired",
+          id: m.id,
+          expires_at: m.expires_at,
+        });
         if (!dry) await this.store.archive(m.id);
         m.status = "archived";
       }
     }
 
-    const active = memories.filter((m) => m.status === "active");
-
     if (!light) {
-      // 3) Merge pass (newest first)
-      const mergeSeen = new Set<string>();
-      for (const m of active) {
-        if (mergeSeen.has(m.id) || m.status !== "active") continue;
-        const similar = await this.store.findSimilar(m.content, {
-          namespace: m.namespace,
-          limit: 5,
-          exclude_id: m.id,
-        });
-        for (const s of similar) {
-          if (mergeSeen.has(s.id)) continue;
+      // 3) Bounded multi-pass merge / clear-supersede
+      for (let pass = 1; pass <= maxPasses; pass++) {
+        const active = memories.filter((m) => m.status === "active");
+        let changesThisPass = 0;
+        const mergeSeen = new Set<string>();
 
-          const decision = shouldSupersede(
-            m.content,
-            s.content,
-            s.score,
-            mergeThreshold,
-          );
+        for (const m of active) {
+          if (mergeSeen.has(m.id) || m.status !== "active") continue;
+          const similar = await this.store.findSimilar(m.content, {
+            namespace: m.namespace,
+            limit: 5,
+            exclude_id: m.id,
+          });
+          for (const s of similar) {
+            if (mergeSeen.has(s.id) || s.status !== "active") continue;
 
-          // Contradiction: keep newer/higher-importance, archive loser with supersedes link
-          if (decision.supersede) {
-            const winner = pickMergeTarget(m, s);
-            const loser = winner.id === m.id ? s : m;
-            details.push({
-              action: "supersede",
-              into: winner.id,
-              from: loser.id,
-              reason: decision.reason,
-              score: s.score,
-            });
-            mergeSeen.add(loser.id);
-            archived++;
-            if (!dry) {
-              await this.store.update(winner.id, {
-                supersedes_id: loser.id,
-                parent_ids: uniqueStrings([
-                  ...(winner.parent_ids ?? []),
-                  loser.id,
-                ]),
-                metadata: {
-                  ...winner.metadata,
-                  supersede_reason: decision.reason,
-                },
-                updated_at: now,
+            const decision = resolveWriteConflict(
+              m.content,
+              s.content,
+              s.score,
+              mergeThreshold,
+            );
+
+            // CLEAR contradiction only (defer on write; prune may still supersede when clear)
+            if (decision.action === "supersede") {
+              const winner = pickMergeTarget(m, s);
+              const loser = winner.id === m.id ? s : m;
+              details.push({
+                action: "supersede",
+                reason: "contradiction",
+                conflict: decision.reason,
+                into: winner.id,
+                from: loser.id,
+                score: s.score,
+                pass,
               });
-              await this.store.archive(loser.id);
+              mergeSeen.add(loser.id);
+              archived++;
+              changesThisPass++;
+              if (!dry) {
+                await this.store.update(winner.id, {
+                  supersedes_id: loser.id,
+                  parent_ids: uniqueStrings([
+                    ...(winner.parent_ids ?? []),
+                    loser.id,
+                  ]),
+                  metadata: {
+                    ...winner.metadata,
+                    supersede_reason: decision.reason,
+                  },
+                  updated_at: now,
+                });
+                await this.store.archive(loser.id);
+              }
               loser.status = "archived";
+              break;
             }
+
+            if (s.score < mergeThreshold) continue;
+            const target = pickMergeTarget(m, s);
+            const source = target.id === m.id ? s : m;
+            if (target.id === source.id) continue;
+
+            details.push({
+              action: "merge",
+              reason: "near_duplicate",
+              into: target.id,
+              from: source.id,
+              score: s.score,
+              pass,
+            });
+            merged++;
+            changesThisPass++;
+            mergeSeen.add(source.id);
+
+            if (!dry) {
+              await this.applyMerge(target, source);
+              await this.store.archive(source.id);
+            }
+            source.status = "archived";
+            // Keep target content updated in local list for later passes
+            if (target.content.length < source.content.length) {
+              target.content = source.content;
+            }
+            target.entities = uniqueStrings([
+              ...target.entities,
+              ...source.entities,
+            ]);
+            target.tags = uniqueStrings([...target.tags, ...source.tags]);
             break;
           }
+        }
 
-          if (s.score < mergeThreshold) continue;
-          // Keep higher importance / newer as target
-          const target = pickMergeTarget(m, s);
-          const source = target.id === m.id ? s : m;
-          if (target.id === source.id) continue;
+        if (changesThisPass === 0) break;
 
-          details.push({
-            action: "merge",
-            into: target.id,
-            from: source.id,
-            score: s.score,
+        // Refresh from store after each pass for correctness (dry uses in-memory status)
+        if (!dry) {
+          memories = await this.store.list({
+            namespace: opts.namespace,
+            status: "active",
+            limit: 5000,
+            order_by: "updated_at",
+            order_dir: "desc",
           });
-          merged++;
-          mergeSeen.add(source.id);
-
-          if (!dry) {
-            await this.applyMerge(target, source);
-            await this.store.archive(source.id);
-            source.status = "archived";
-            archived++;
-          }
-          break; // one merge per source pass
+        } else {
+          memories = memories.filter((m) => m.status === "active");
         }
       }
 
-      // Refresh active list conceptually
-      const stillActive = active.filter((m) => m.status === "active");
+      const stillActive = memories.filter((m) => m.status === "active");
 
       // 4) Score-floor eviction (with grace period)
+      // Policy: never score-floor procedural when evict_procedural is false
       const graceDays = this.cfg.consolidation.grace_period_days;
       for (const m of stillActive) {
         if (m.tier === "procedural" && !this.cfg.consolidation.evict_procedural) {
@@ -173,6 +219,7 @@ export class ConsolidationService {
         if (m.decay_score < floor && ageDays >= graceDays) {
           details.push({
             action: "evict_floor",
+            reason: "score_floor",
             id: m.id,
             decay_score: m.decay_score,
             floor,
@@ -197,7 +244,12 @@ export class ConsolidationService {
           const promo = await this.promotion.autoPromote(opts.namespace);
           promoted = promo.length;
           for (const p of promo) {
-            details.push({ action: "promote", id: p.id, sources: p.source_ids });
+            details.push({
+              action: "promote",
+              reason: "auto_promote",
+              id: p.id,
+              sources: p.source_ids,
+            });
           }
         } catch (err) {
           log.warn("auto-promote failed", { error: String(err) });
@@ -206,10 +258,18 @@ export class ConsolidationService {
 
       // 7) Purge old archives
       if (!dry) {
-        const cutoff = addDaysIso(now, -this.cfg.consolidation.archive_retention_days);
+        const cutoff = addDaysIso(
+          now,
+          -this.cfg.consolidation.archive_retention_days,
+        );
         purged = await this.store.purgeArchivedOlderThan(cutoff);
         if (purged > 0) {
-          details.push({ action: "purge_archives", count: purged, cutoff });
+          details.push({
+            action: "purge_archives",
+            reason: "archive_retention",
+            count: purged,
+            cutoff,
+          });
         }
       }
     }
@@ -263,7 +323,9 @@ export class ConsolidationService {
 
   private async applyMerge(target: Memory, source: Memory): Promise<Memory> {
     const content =
-      source.content.length > target.content.length ? source.content : target.content;
+      source.content.length > target.content.length
+        ? source.content
+        : target.content;
     const now = nowIso();
     return this.store.update(target.id, {
       content,
@@ -271,7 +333,10 @@ export class ConsolidationService {
       tags: uniqueStrings([...target.tags, ...source.tags]),
       entities: uniqueStrings([...target.entities, ...source.entities]),
       importance: Math.max(target.importance, source.importance),
-      confidence: Math.min(1, Math.max(target.confidence, source.confidence) + 0.05),
+      confidence: Math.min(
+        1,
+        Math.max(target.confidence, source.confidence) + 0.05,
+      ),
       parent_ids: uniqueStrings([...target.parent_ids, source.id]),
       access_count: target.access_count + source.access_count,
       last_accessed_at: now,
@@ -297,6 +362,13 @@ export class ConsolidationService {
     });
   }
 
+  /**
+   * Cap enforcement policy:
+   * - Non-procedural: archive lowest decay until under tier cap.
+   * - Procedural when evict_procedural=false: never archive for tier/global cap;
+   *   emit cap_skip_procedural if over tier cap.
+   * - Global cap never takes procedural when flag is false.
+   */
   private async enforceCaps(
     active: Memory[],
     dry: boolean,
@@ -304,40 +376,32 @@ export class ConsolidationService {
   ): Promise<{ archived: number }> {
     let archived = 0;
     const caps = this.cfg.consolidation.caps;
+    const allowProc = this.cfg.consolidation.evict_procedural;
 
-    // Per-tier caps
     for (const tier of MEMORY_TIERS) {
-      if (tier === "procedural" && !this.cfg.consolidation.evict_procedural) {
-        // Still enforce procedural cap only if over hard limit * 1.5
-        const list = active
-          .filter((m) => m.tier === tier && m.status === "active")
-          .sort(evictionOrder);
-        const cap = caps[tier];
-        while (list.length > cap) {
-          const victim = list.pop()!;
-          if (victim.tier === "procedural" && list.length <= cap * 1.5) break;
-          details.push({
-            action: "evict_cap",
-            tier,
-            id: victim.id,
-            decay_score: victim.decay_score,
-            preview: truncate(victim.content, 60),
-          });
-          victim.status = "archived";
-          archived++;
-          if (!dry) await this.store.archive(victim.id);
-        }
-        continue;
-      }
-
       const list = active
         .filter((m) => m.tier === tier && m.status === "active")
         .sort(evictionOrder);
       const cap = caps[tier];
+
+      if (tier === "procedural" && !allowProc) {
+        if (list.length > cap) {
+          details.push({
+            action: "cap_skip_procedural",
+            reason: "cap_tier_protected",
+            tier,
+            count: list.length,
+            cap,
+          });
+        }
+        continue;
+      }
+
       while (list.length > cap) {
         const victim = list.pop()!;
         details.push({
           action: "evict_cap",
+          reason: "cap_tier",
           tier,
           id: victim.id,
           decay_score: victim.decay_score,
@@ -349,18 +413,16 @@ export class ConsolidationService {
       }
     }
 
-    // Global cap
+    // Global cap — exclude procedural unless explicitly allowed
     const globalActive = active
       .filter((m) => m.status === "active")
-      .filter(
-        (m) =>
-          m.tier !== "procedural" || this.cfg.consolidation.evict_procedural,
-      )
+      .filter((m) => m.tier !== "procedural" || allowProc)
       .sort(evictionOrder);
     while (globalActive.length > caps.global) {
       const victim = globalActive.pop()!;
       details.push({
         action: "evict_global",
+        reason: "cap_global",
         id: victim.id,
         tier: victim.tier,
         decay_score: victim.decay_score,

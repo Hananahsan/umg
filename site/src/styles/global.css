@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+/* Avantt — self-hosted from public/fonts */
+@font-face {
+  font-family: "Avantt";
+  src: url("/fonts/Avantt-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avantt";
+  src: url("/fonts/Avantt-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avantt";
+  src: url("/fonts/Avantt-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avantt";
+  src: url("/fonts/Avantt-SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avantt";
+  src: url("/fonts/Avantt-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Variable font fallback for intermediate weights */
+@font-face {
+  font-family: "Avantt VF";
+  src: url("/fonts/AvanttVF.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* Black / white / soft violet (lavender) */
+  --color-bg: #000000;
+  --color-bg-elevated: #0a0a0a;
+  --color-surface: #111111;
+  --color-surface-2: #161616;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-text: #ffffff;
+  --color-text-muted: #a3a3a3;
+  --color-text-faint: #6b6b6b;
+  --color-accent: #c4b5fd;
+  --color-accent-dim: rgba(196, 181, 253, 0.14);
+  --color-accent-hover: #ddd6fe;
+  --color-accent-glow: rgba(196, 181, 253, 0.22);
+
+  --font-display: "Avantt", "Avantt VF", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Avantt", "Avantt VF", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Avantt", "Avantt VF", ui-sans-serif, system-ui, sans-serif;
+
+  --container-content: 72rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+    color: var(--color-text);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .container-content {
+    width: 100%;
+    max-width: var(--container-content);
+    margin-inline: auto;
+    padding-inline: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .container-content {
+      padding-inline: 2rem;
+    }
+  }
+
+  .eyebrow {
+    @apply font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-text-faint;
+  }
+
+  .section-pad {
+    @apply py-20 md:py-28;
+  }
+
+  .btn-primary {
+    @apply inline-flex h-11 items-center justify-center rounded-md bg-accent px-5 text-sm font-medium text-bg transition-colors duration-200 hover:bg-accent-hover;
+  }
+
+  .btn-ghost {
+    @apply inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-transparent px-5 text-sm font-medium text-text transition-colors duration-200 hover:border-white/30 hover:bg-white/[0.03];
+  }
+
+  .panel {
+    @apply rounded-xl border border-border bg-surface;
+  }
+
+  .code-window {
+    @apply overflow-hidden rounded-xl border border-border bg-[#0a0a0a] shadow-[0_0_0_1px_rgba(255,255,255,0.03)];
+  }
+
+  .grain {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    opacity: 0.028;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
+  }
+
+  .fade-up {
+    animation: fade-up 0.7s ease-out both;
+  }
+
+  .fade-up-delay-1 {
+    animation-delay: 0.08s;
+  }
+
+  .fade-up-delay-2 {
+    animation-delay: 0.16s;
+  }
+
+  .fade-up-delay-3 {
+    animation-delay: 0.24s;
+  }
+
+  .tab-btn {
+    @apply rounded-md px-3 py-1.5 text-xs font-medium text-text-muted transition-colors;
+  }
+
+  .tab-btn[aria-selected="true"] {
+    @apply bg-white/8 text-text;
+  }
+
+  .tab-panel[hidden] {
+    display: none;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .fade-up-delay-1,
+  .fade-up-delay-2,
+  .fade-up-delay-3 {
+    animation: none;
+  }
+}

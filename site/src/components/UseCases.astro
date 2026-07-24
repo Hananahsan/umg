@@ -1,0 +1,47 @@
+---
+const cases = [
+  {
+    title: "Coding agents",
+    body: "Claude Code and Cursor agents that recall project decisions, style prefs, and past fixes — instead of relearning every session.",
+  },
+  {
+    title: "Personal agent memory",
+    body: "Preferences, constraints, and standing instructions that survive context resets across tools.",
+  },
+  {
+    title: "Project knowledge",
+    body: "Namespace-scoped facts for each codebase: architecture choices, naming rules, and hard-won lessons.",
+  },
+  {
+    title: "Skill promotion",
+    body: "Patterns that prove useful get promoted to procedural skills — durable playbooks, not one-off notes.",
+  },
+];
+---
+
+<section class="section-pad border-t border-border bg-bg-elevated/40" id="use-cases" aria-labelledby="use-cases-heading">
+  <div class="container-content">
+    <div class="max-w-2xl">
+      <p class="eyebrow mb-4">Use cases</p>
+      <h2
+        id="use-cases-heading"
+        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text"
+      >
+        Built for agents that need durable context.
+      </h2>
+    </div>
+
+    <div class="mt-12 grid gap-4 sm:grid-cols-2">
+      {
+        cases.map((c) => (
+          <article class="panel p-7 transition-colors hover:border-border-strong">
+            <h3 class="font-display text-base font-semibold tracking-tight text-text">
+              {c.title}
+            </h3>
+            <p class="mt-2 text-sm leading-relaxed text-text-muted">{c.body}</p>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>

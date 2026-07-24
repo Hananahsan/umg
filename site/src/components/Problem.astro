@@ -1,0 +1,48 @@
+---
+const pains = [
+  {
+    title: "Agents forget every session",
+    body: "Preferences, decisions, and project context die when the context window resets. You re-explain the same things.",
+  },
+  {
+    title: "Flat stores bloat",
+    body: "Dump everything into one bag and recall gets noisy. Tokens rise. Signal falls. Memory becomes a liability.",
+  },
+  {
+    title: "No lifecycle discipline",
+    body: "Without tiers, scores, and pruning, agents keep stale facts and never promote proven patterns into skills.",
+  },
+];
+---
+
+<section class="section-pad" id="problem" aria-labelledby="problem-heading">
+  <div class="container-content">
+    <div class="max-w-2xl">
+      <p class="eyebrow mb-4">The problem</p>
+      <h2
+        id="problem-heading"
+        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text text-balance"
+      >
+        What should be remembered gets forgotten — or never cleaned.
+      </h2>
+      <p class="mt-5 max-w-xl text-base leading-relaxed text-text-muted">
+        Agent amnesia and unbounded memory bloat are two sides of the same
+        infrastructure gap. Nura is the layer in between.
+      </p>
+    </div>
+
+    <div class="mt-14 grid gap-4 md:grid-cols-3">
+      {
+        pains.map((item, i) => (
+          <article class="panel p-7">
+            <span class="font-mono text-xs text-accent/80">0{i + 1}</span>
+            <h3 class="mt-4 font-display text-base font-semibold tracking-tight text-text">
+              {item.title}
+            </h3>
+            <p class="mt-2 text-sm leading-relaxed text-text-muted">{item.body}</p>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>

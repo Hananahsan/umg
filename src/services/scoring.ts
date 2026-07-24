@@ -1,5 +1,6 @@
 import type { UmgConfig } from "../config.js";
 import type { Memory, MemoryTier, ScoredMemory } from "../types.js";
+import { entityOverlapScore } from "../util/entities.js";
 import { clamp, daysBetween, nowIso, tokenize } from "../util/text.js";
 
 const TIER_PRIOR: Record<MemoryTier, number> = {
@@ -119,17 +120,27 @@ export function computeDecayScore(
   return clamp(score);
 }
 
-/** Re-rank FTS hits with multi-factor score. */
+/**
+ * Re-rank FTS hits with multi-factor score (v0.1.2).
+ *
+ * score = 0.32·fts + 0.18·importance + 0.18·decay
+ *       + 0.08·tier + 0.08·recency + 0.16·entity
+ *
+ * Entity term: fraction of query-extracted entities matched on memory
+ * entities[] (content substring fallback). Local/offline, no embeddings.
+ */
 export function rankForRecall(
   candidates: ScoredMemory[],
   cfg: UmgConfig,
   now: string = nowIso(),
+  queryText?: string,
 ): ScoredMemory[] {
-  const wFts = 0.4;
-  const wImp = 0.2;
-  const wDecay = 0.2;
-  const wTier = 0.1;
-  const wRecency = 0.1;
+  const wFts = 0.32;
+  const wImp = 0.18;
+  const wDecay = 0.18;
+  const wTier = 0.08;
+  const wRecency = 0.08;
+  const wEntity = 0.16;
 
   return candidates
     .map((m) => {
@@ -138,12 +149,16 @@ export function rankForRecall(
       const tierP = RECALL_TIER_PRIOR[m.tier];
       const ageDays = daysBetween(m.last_accessed_at, now);
       const recency = clamp(1 - ageDays / 30);
+      const entity = queryText
+        ? entityOverlapScore(queryText, m)
+        : 0;
       const score =
         wFts * fts +
         wImp * m.importance +
         wDecay * decay +
         wTier * tierP +
-        wRecency * recency;
+        wRecency * recency +
+        wEntity * entity;
       return {
         ...m,
         decay_score: decay,
@@ -154,6 +169,7 @@ export function rankForRecall(
           decay,
           tier: tierP,
           recency,
+          entity,
         },
       };
     })

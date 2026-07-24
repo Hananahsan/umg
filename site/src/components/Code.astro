@@ -1,0 +1,131 @@
+---
+import { DOCS, GITHUB } from "../lib/links";
+
+const tabs = [
+  {
+    id: "cli",
+    label: "CLI",
+    code: `# Install & build
+npm install && npm run build
+
+# Store a fact
+npx umg retain --content "Prefer TypeScript strict mode" --tier semantic
+
+# Recall it
+npx umg recall --query "TypeScript"
+
+# Stats & prune
+npx umg stats
+npx umg prune --dry-run`,
+  },
+  {
+    id: "mcp",
+    label: "MCP config",
+    code: `{
+  "mcpServers": {
+    "nura": {
+      "command": "node",
+      "args": ["/path/to/umg/dist/index.js", "mcp"],
+      "env": {
+        "UMG_DB_PATH": "~/.umg/memory.db"
+      }
+    }
+  }
+}`,
+  },
+  {
+    id: "agent",
+    label: "Agent pattern",
+    code: `# Session start
+recall(query: "project name + current task")
+
+# When you learn something durable
+retain(content: "concise fact", tier: "semantic")
+
+# Session end
+reflect(text: "decisions and preferences from session")
+
+# Periodically
+prune(dry_run: true)  # then without dry_run`,
+  },
+];
+---
+
+<section class="section-pad border-t border-border" id="code" aria-labelledby="code-heading">
+  <div class="container-content">
+    <div class="grid items-start gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
+      <div>
+        <p class="eyebrow mb-4">Quickstart</p>
+        <h2
+          id="code-heading"
+          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text text-balance"
+        >
+          Memory in minutes. Not a platform migration.
+        </h2>
+        <p class="mt-5 text-base leading-relaxed text-text-muted">
+          Connect via MCP or use the CLI. Same tools for retain, recall, reflect,
+          and prune — whether you are in Claude Code, Cursor, or a custom agent.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href={DOCS} class="btn-primary">Read the quickstart</a>
+          <a href={GITHUB} class="btn-ghost">GitHub</a>
+        </div>
+      </div>
+
+      <div class="code-window" data-tabs>
+        <div
+          class="flex items-center gap-1 border-b border-border px-3 py-2"
+          role="tablist"
+          aria-label="Code examples"
+        >
+          {
+            tabs.map((tab, i) => (
+              <button
+                type="button"
+                class="tab-btn"
+                role="tab"
+                id={`tab-${tab.id}`}
+                aria-selected={i === 0 ? "true" : "false"}
+                aria-controls={`panel-${tab.id}`}
+                data-tab={tab.id}
+              >
+                {tab.label}
+              </button>
+            ))
+          }
+        </div>
+
+        {
+          tabs.map((tab, i) => (
+            <div
+              class="tab-panel p-5"
+              role="tabpanel"
+              id={`panel-${tab.id}`}
+              aria-labelledby={`tab-${tab.id}`}
+              hidden={i !== 0}
+              data-panel={tab.id}
+            >
+              <pre class="overflow-x-auto font-mono text-[0.8125rem] leading-relaxed text-text-muted"><code>{tab.code}</code></pre>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  document.querySelectorAll("[data-tabs]").forEach((root) => {
+    const tabs = root.querySelectorAll("[data-tab]");
+    const panels = root.querySelectorAll("[data-panel]");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const id = tab.getAttribute("data-tab");
+        tabs.forEach((t) => t.setAttribute("aria-selected", t === tab ? "true" : "false"));
+        panels.forEach((p) => {
+          p.hidden = p.getAttribute("data-panel") !== id;
+        });
+      });
+    });
+  });
+</script>
