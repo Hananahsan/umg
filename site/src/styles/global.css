@@ -83,6 +83,8 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    /* Prevent horizontal page scroll from wide code / mono blocks */
+    overflow-x: clip;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -102,6 +104,31 @@
   body {
     @apply bg-bg text-text font-sans antialiased;
     min-height: 100vh;
+    overflow-x: clip;
+  }
+
+  /* Grid/flex children can grow past the viewport without this (pre/code min-content). */
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  pre {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  code {
+    word-break: break-word;
+  }
+
+  pre code {
+    word-break: normal;
+    white-space: pre;
   }
 
   ::selection {
@@ -124,7 +151,15 @@
     width: 100%;
     max-width: var(--container-content);
     margin-inline: auto;
-    padding-inline: 1.5rem;
+    padding-inline: 1.25rem;
+    /* Allow nested grids to shrink; stop pre/code from blowing out the page */
+    min-width: 0;
+  }
+
+  @media (min-width: 480px) {
+    .container-content {
+      padding-inline: 1.5rem;
+    }
   }
 
   @media (min-width: 768px) {
@@ -133,12 +168,20 @@
     }
   }
 
+  /* Horizontal scroll stays inside the code chrome, not the page */
+  .code-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
   .eyebrow {
     @apply font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-text-faint;
   }
 
   .section-pad {
-    @apply py-20 md:py-28;
+    @apply py-14 sm:py-20 md:py-28;
   }
 
   .btn-primary {
@@ -245,7 +288,7 @@
   }
 
   .logo-chip {
-    @apply inline-flex items-center gap-2.5 rounded-full border border-black/10 bg-black/[0.02] px-3.5 py-2 text-sm font-medium text-text-muted transition-colors hover:border-black/20 hover:text-text;
+    @apply inline-flex items-center gap-2 rounded-full border border-black/10 bg-black/[0.02] px-2.5 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-black/20 hover:text-text sm:gap-2.5 sm:px-3.5 sm:py-2 sm:text-sm;
   }
 
   .logo-chip img,

@@ -10,3 +10,5 @@ coverage/
 .DS_Store
 *.log
 .vitest/
+.vercel
+.gstack/

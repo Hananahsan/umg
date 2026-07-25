@@ -72,7 +72,8 @@ const {
     align-items: flex-start;
     gap: 0.5rem;
     width: 100%;
-    max-width: 22rem;
+    max-width: min(22rem, 100%);
+    min-width: 0;
   }
 
   .install-block__label {

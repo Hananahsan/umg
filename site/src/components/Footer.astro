@@ -56,10 +56,10 @@ const columns = [
     </div>
   </div>
 
-  <div class="container-content relative z-10 py-16 md:py-20">
+  <div class="container-content relative z-10 py-12 sm:py-16 md:py-20">
     <!-- Closing line sits in the sky / mist zone -->
     <p
-      class="font-display max-w-xl text-[clamp(1.5rem,3.5vw,2.25rem)] font-semibold leading-snug tracking-[-0.03em] text-white text-balance"
+      class="font-display max-w-xl text-[clamp(1.375rem,5.5vw,2.25rem)] font-semibold leading-snug tracking-[-0.03em] text-white text-balance"
     >
       Memory that spans sessions.
       <span class="mt-1 block font-normal text-white/70"
@@ -67,7 +67,7 @@ const columns = [
       >
     </p>
 
-    <div class="mt-14 grid gap-12 md:grid-cols-[1.15fr_2fr] md:gap-16">
+    <div class="mt-10 grid min-w-0 gap-10 sm:mt-14 sm:gap-12 md:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)] md:gap-16">
       <div>
         <a
           href="/"
@@ -139,7 +139,7 @@ const columns = [
         </ul>
       </div>
 
-      <div class="grid grid-cols-2 gap-8 sm:grid-cols-3">
+      <div class="grid min-w-0 grid-cols-2 gap-6 sm:grid-cols-3 sm:gap-8">
         {
           columns.map((col) => (
             <div>

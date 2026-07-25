@@ -55,12 +55,12 @@ promote_to_skill(...) # dry_run first when unsure`,
 
 <section class="section-pad border-0 bg-white" id="code" aria-labelledby="code-heading">
   <div class="container-content">
-    <div class="grid items-start gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
-      <div>
+    <div class="grid min-w-0 items-start gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
+      <div class="min-w-0">
         <p class="eyebrow mb-4">Quickstart</p>
         <h2
           id="code-heading"
-          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-black text-balance"
+          class="font-display text-[clamp(1.625rem,4.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-black text-balance"
         >
           Memory in minutes. Not a platform migration.
         </h2>
@@ -78,10 +78,10 @@ promote_to_skill(...) # dry_run first when unsure`,
         </div>
       </div>
 
-      <div>
-        <div class="code-window" data-tabs>
+      <div class="min-w-0 w-full">
+        <div class="code-window max-w-full" data-tabs>
           <div
-            class="flex items-center gap-1 border-b border-white/10 px-3 py-2"
+            class="flex items-center gap-1 overflow-x-auto border-b border-white/10 px-2 py-2 sm:px-3"
             role="tablist"
             aria-label="Code examples"
           >
@@ -89,7 +89,7 @@ promote_to_skill(...) # dry_run first when unsure`,
               tabs.map((tab, i) => (
                 <button
                   type="button"
-                  class="tab-btn !text-neutral-400 aria-selected:!bg-white/10 aria-selected:!text-white"
+                  class="tab-btn shrink-0 !text-neutral-400 aria-selected:!bg-white/10 aria-selected:!text-white"
                   role="tab"
                   id={`tab-${tab.id}`}
                   aria-selected={i === 0 ? "true" : "false"}
@@ -105,14 +105,14 @@ promote_to_skill(...) # dry_run first when unsure`,
           {
             tabs.map((tab, i) => (
               <div
-                class="tab-panel p-5"
+                class="tab-panel min-w-0 p-3 sm:p-5"
                 role="tabpanel"
                 id={`panel-${tab.id}`}
                 aria-labelledby={`tab-${tab.id}`}
                 hidden={i !== 0}
                 data-panel={tab.id}
               >
-                <pre class="overflow-x-auto font-mono text-[0.8125rem] leading-relaxed text-neutral-300"><code>{tab.code}</code></pre>
+                <pre class="code-scroll max-w-full overflow-x-auto font-mono text-[0.75rem] leading-relaxed text-neutral-300 sm:text-[0.8125rem]"><code>{tab.code}</code></pre>
               </div>
             ))
           }

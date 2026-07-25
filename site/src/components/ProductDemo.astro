@@ -52,12 +52,12 @@ const memories = [
 
 <section class="section-pad border-0 bg-transparent" id="product" aria-labelledby="product-heading">
   <div class="container-content">
-    <div class="grid items-start gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-      <div>
+    <div class="grid min-w-0 items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
+      <div class="min-w-0">
         <p class="eyebrow mb-4">Product</p>
         <h2
           id="product-heading"
-          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-white text-balance"
+          class="font-display text-[clamp(1.625rem,4.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-white text-balance"
         >
           Hierarchical memory, not a bigger bag.
         </h2>
@@ -85,19 +85,19 @@ const memories = [
         </ul>
       </div>
 
-      <div class="code-window">
+      <div class="code-window min-w-0 max-w-full">
         <div
-          class="flex items-center justify-between border-b border-white/10 px-4 py-3"
+          class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-3 sm:px-4"
         >
-          <div class="flex items-center gap-3">
+          <div class="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             <span class="font-display text-sm font-semibold text-white">umg0</span>
             <span
               class="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[0.625rem] text-neutral-500"
               >namespace · global</span
             >
           </div>
-          <span class="flex items-center gap-1.5 text-xs text-neutral-500">
-            <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
+          <span class="flex items-center gap-1.5 text-[0.6875rem] text-neutral-500 sm:text-xs">
+            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>
             local sqlite · WAL
           </span>
         </div>
@@ -138,12 +138,12 @@ const memories = [
           <ul class="space-y-1">
             {
               memories.map((m) => (
-                <li class="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
-                  <div class="min-w-0">
+                <li class="flex items-start justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-white/[0.03] sm:gap-3 sm:px-3">
+                  <div class="min-w-0 flex-1">
                     <span class="font-mono text-[0.625rem] text-accent/80">
                       {m.tier}
                     </span>
-                    <p class="mt-0.5 truncate text-sm text-white">{m.content}</p>
+                    <p class="mt-0.5 break-words text-sm text-white sm:truncate">{m.content}</p>
                   </div>
                   <span class="shrink-0 font-mono text-xs text-neutral-500">
                     {m.score}

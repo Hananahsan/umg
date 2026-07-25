@@ -7,13 +7,13 @@ import BrandLogo from "./BrandLogo";
   class="fixed inset-x-0 top-0 z-40 border-b border-black/[0.06] bg-white/85 backdrop-blur-md"
 >
   <nav
-    class="container-content flex h-16 items-center justify-between gap-4"
+    class="container-content flex h-14 items-center justify-between gap-3 sm:h-16 sm:gap-4"
     aria-label="Primary"
   >
-    <div class="flex items-center gap-8">
+    <div class="flex min-w-0 items-center gap-6 sm:gap-8">
       <a
         href="/"
-        class="flex items-center gap-2.5 text-black no-underline"
+        class="flex shrink-0 items-center gap-2 text-black no-underline sm:gap-2.5"
         aria-label="umg0 home"
       >
         <BrandLogo client:load size={20} theme="light" />
@@ -46,10 +46,11 @@ import BrandLogo from "./BrandLogo";
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
       <a
         href={GITHUB}
-        class="btn-ghost hidden !h-8 !px-3 !text-xs sm:inline-flex"
+        class="btn-ghost !h-8 !px-2.5 !text-xs sm:inline-flex sm:!px-3"
+        aria-label="GitHub"
       >
         <img
           src="/logos/github-dark.svg"
@@ -58,9 +59,9 @@ import BrandLogo from "./BrandLogo";
           width="14"
           height="14"
         />
-        <span>GitHub</span>
+        <span class="hidden sm:inline">GitHub</span>
       </a>
-      <a href={DOCS} class="btn-primary !h-8 !px-3.5 !text-xs">Get Started</a>
+      <a href={DOCS} class="btn-primary !h-8 !px-3 !text-xs sm:!px-3.5">Get Started</a>
     </div>
   </nav>
 </header>
