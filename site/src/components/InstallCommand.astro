@@ -1,0 +1,261 @@
+---
+/**
+ * Embeddable package install line with copy + shiny border.
+ * Command matches package.json name: @umg0/umg0
+ */
+interface Props {
+  command?: string;
+  label?: string;
+  class?: string;
+}
+
+const {
+  command = "npm i @umg0/umg0",
+  label = "Install",
+  class: className = "",
+} = Astro.props;
+---
+
+<div class:list={["install-block", className]} data-install>
+  <p class="install-block__label">{label}</p>
+  <div class="install-chip">
+    <div class="install-chip__shine" aria-hidden="true"></div>
+    <div class="install-chip__inner">
+      <span class="install-chip__prompt" aria-hidden="true">›</span>
+      <code class="install-chip__cmd" data-install-cmd>{command}</code>
+      <button
+        type="button"
+        class="install-chip__copy"
+        data-install-copy
+        aria-label={`Copy: ${command}`}
+        title="Copy"
+      >
+        <svg
+          class="install-chip__icon install-chip__icon--copy"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+          ></path>
+        </svg>
+        <svg
+          class="install-chip__icon install-chip__icon--check"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M20 6 9 17l-5-5"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .install-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 22rem;
+  }
+
+  .install-block__label {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #737373;
+    letter-spacing: 0.01em;
+  }
+
+  .install-chip {
+    position: relative;
+    width: 100%;
+    border-radius: 0.75rem;
+    padding: 1px;
+    isolation: isolate;
+  }
+
+  /* Animated conic shine around the edge */
+  .install-chip__shine {
+    position: absolute;
+    inset: -1px;
+    z-index: 0;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--shine-angle, 0deg),
+      #c4b5fd 0%,
+      #ffffff 18%,
+      #ddd6fe 32%,
+      #a78bfa 48%,
+      #e8e8e8 62%,
+      #c4b5fd 78%,
+      #ffffff 90%,
+      #c4b5fd 100%
+    );
+    animation: install-shine 4s linear infinite;
+    opacity: 0.95;
+  }
+
+  .install-chip__shine::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: calc(0.75rem - 1px);
+    background: #ffffff;
+  }
+
+  .install-chip__inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.55rem 0.55rem 0.95rem;
+    border-radius: calc(0.75rem - 1px);
+    background: #fafafa;
+  }
+
+  .install-chip__prompt {
+    flex-shrink: 0;
+    font-family: "Avantt", "Avantt VF", ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #a3a3a3;
+    user-select: none;
+  }
+
+  .install-chip__cmd {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: "Avantt", "Avantt VF", ui-monospace, monospace;
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: #171717;
+    background: none;
+  }
+
+  .install-chip__copy {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #737373;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  .install-chip__copy:hover {
+    color: #0a0a0a;
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .install-chip__copy:focus-visible {
+    outline: 2px solid #c4b5fd;
+    outline-offset: 2px;
+  }
+
+  .install-chip__icon--check {
+    display: none;
+    color: #16a34a;
+  }
+
+  .install-chip.is-copied .install-chip__icon--copy {
+    display: none;
+  }
+
+  .install-chip.is-copied .install-chip__icon--check {
+    display: block;
+  }
+
+  @property --shine-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  @keyframes install-shine {
+    to {
+      --shine-angle: 360deg;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .install-chip__shine {
+      animation: none;
+      background: linear-gradient(
+        135deg,
+        #c4b5fd 0%,
+        #e5e5e5 40%,
+        #ddd6fe 70%,
+        #c4b5fd 100%
+      );
+    }
+  }
+</style>
+
+<script>
+  function wireInstall(root: ParentNode = document) {
+    root.querySelectorAll<HTMLElement>("[data-install]").forEach((block) => {
+      if (block.dataset.wired === "1") return;
+      block.dataset.wired = "1";
+
+      const chip = block.querySelector(".install-chip");
+      const cmd = block.querySelector<HTMLElement>("[data-install-cmd]");
+      const btn = block.querySelector<HTMLButtonElement>("[data-install-copy]");
+      if (!chip || !cmd || !btn) return;
+
+      btn.addEventListener("click", async () => {
+        const text = cmd.textContent?.trim() ?? "";
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
+        chip.classList.add("is-copied");
+        btn.setAttribute("aria-label", "Copied");
+        window.setTimeout(() => {
+          chip.classList.remove("is-copied");
+          btn.setAttribute("aria-label", `Copy: ${text}`);
+        }, 1600);
+      });
+    });
+  }
+
+  wireInstall();
+  document.addEventListener("astro:page-load", () => wireInstall());
+</script>

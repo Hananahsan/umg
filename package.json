@@ -1,10 +1,13 @@
 {
-  "name": "umg",
-  "version": "0.2.0",
+  "name": "@umg0/umg0",
+  "version": "0.2.1",
   "description": "Unified Memory Gateway — MCP-first, local-first hierarchical memory for AI agents",
   "type": "module",
   "bin": {
-    "umg": "./dist/index.js"
+    "umg0": "dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "main": "./dist/index.js",
   "exports": {
@@ -12,6 +15,7 @@
   },
   "files": [
     "dist",
+    "examples",
     "config.example.yaml",
     "README.md",
     "ARCHITECTURE.md"
@@ -21,6 +25,8 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "mcp": "tsx src/index.ts mcp",
+    "prepublishOnly": "npm run build",
+    "prepack": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -29,12 +35,24 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hananahsan/umg.git"
+  },
+  "homepage": "https://github.com/Hananahsan/umg#readme",
+  "bugs": {
+    "url": "https://github.com/Hananahsan/umg/issues"
+  },
+  "author": "Hanan Ahsan",
   "keywords": [
     "mcp",
     "memory",
     "ai-agents",
     "sqlite",
-    "hierarchical-memory"
+    "hierarchical-memory",
+    "umg0",
+    "claude-code",
+    "cursor"
   ],
   "license": "MIT",
   "dependencies": {

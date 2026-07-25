@@ -1,25 +1,19 @@
 ---
 import { DOCS, EXAMPLES, GITHUB } from "../lib/links";
+import InstallCommand from "./InstallCommand.astro";
 
 const tabs = [
   {
     id: "cli",
     label: "CLI",
-    code: `# From the umg repo
-npm install && npm run build
+    code: `# Preferred (npm package @umg0/umg0)
+npx -y @umg0/umg0 retain --content "Prefer TypeScript strict mode" --tier semantic
+npx -y @umg0/umg0 recall --query "TypeScript"
+npx -y @umg0/umg0 stats
+npx -y @umg0/umg0 prune --dry-run
 
-# Store a fact
-node dist/index.js retain --content "Prefer TypeScript strict mode" --tier semantic
-
-# Recall it
-node dist/index.js recall --query "TypeScript"
-
-# Stats (weights + 7d metrics + size)
-node dist/index.js stats
-
-# Dry-run prune, then compact DB
-node dist/index.js prune --dry-run
-node dist/index.js compact`,
+# After: npm i -g @umg0/umg0
+# umg0 retain --content "..." --tier semantic`,
   },
   {
     id: "mcp",
@@ -27,36 +21,34 @@ node dist/index.js compact`,
     code: `{
   "mcpServers": {
     "umg": {
-      "command": "node",
-      "args": ["/absolute/path/to/umg/dist/index.js", "mcp"],
+      "command": "npx",
+      "args": ["-y", "@umg0/umg0", "mcp"],
       "env": {
-        "UMG_DB_PATH": "/absolute/path/to/home/.umg/memory.db"
+        "UMG_LOG_LEVEL": "info"
       }
     }
   }
 }
 
-// Same block shape for Claude Code, Cursor, Cline, VS Code, Zed, …
-// Only the config file location changes.
+// Same block for Claude Code, Cursor, Cline, VS Code, Zed, …
+// Global install alternative: command "umg0", args ["mcp"]
 // See: github.com/Hananahsan/umg/tree/main/examples`,
   },
   {
     id: "agent",
     label: "Agent pattern",
     code: `# Session start
-recall(query: "project name + current task")
-# or MCP prompt: session-start
+recall(query: "project + task + entities", namespace: "project:slug")
 
 # When you learn something durable
 retain(content: "concise fact", tier: "semantic")
 
 # Session end
-reflect(text: "decisions and preferences from session")
-# or MCP prompt: session-end
+reflect(text: "Decision: ...\\nPreference: ...\\nCorrection: ...")
 
 # Periodically
 prune(dry_run: true)  # then without dry_run
-promote_to_skill(...) # or dry_run first`,
+promote_to_skill(...) # dry_run first when unsure`,
   },
 ];
 ---
@@ -74,8 +66,11 @@ promote_to_skill(...) # or dry_run first`,
         </h2>
         <p class="mt-5 text-base leading-relaxed text-neutral-500">
           Connect via MCP or use the CLI. Same six tools for retain, recall, reflect,
-          list, prune, and promote — in any MCP-compatible client.
+          list, prune, and promote in any MCP-compatible client.
         </p>
+        <div class="mt-7">
+          <InstallCommand command="npm i @umg0/umg0" />
+        </div>
         <div class="mt-8 flex flex-wrap gap-3">
           <a href={DOCS} class="btn-primary">Read the quickstart</a>
           <a href={EXAMPLES} class="btn-ghost">Client configs</a>

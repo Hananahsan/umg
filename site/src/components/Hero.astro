@@ -1,5 +1,6 @@
 ---
 import { DOCS, GITHUB } from "../lib/links";
+import InstallCommand from "./InstallCommand.astro";
 ---
 
 <section
@@ -38,7 +39,11 @@ import { DOCS, GITHUB } from "../lib/links";
         <a href={GITHUB} class="btn-ghost">View on GitHub</a>
       </div>
 
-      <p class="fade-up fade-up-delay-3 mt-8 text-sm text-neutral-400">
+      <div class="fade-up fade-up-delay-3 mt-7">
+        <InstallCommand command="npm i @umg0/umg0" />
+      </div>
+
+      <p class="fade-up fade-up-delay-3 mt-6 text-sm text-neutral-400">
         Drop-in via MCP (stdio). Offline by default. No cloud required.
       </p>
 
@@ -55,7 +60,13 @@ import { DOCS, GITHUB } from "../lib/links";
           <span>Cursor</span>
         </li>
         <li class="logo-chip pointer-events-none">
-          <img src="/logos/hermes.svg" alt="" width="16" height="16" class="object-contain" />
+          <img
+            src="/logos/hermes-mark.png"
+            alt=""
+            width="16"
+            height="16"
+            class="rounded-sm object-cover"
+          />
           <span>Hermes</span>
         </li>
         <li class="logo-chip pointer-events-none">
@@ -102,7 +113,7 @@ import { DOCS, GITHUB } from "../lib/links";
           <p class="mt-1">
             <span class="text-accent">→</span>
             <span class="text-black">recall</span>
-            <span class="text-neutral-500">("nura landing page")</span>
+            <span class="text-neutral-500">("umg0 landing page")</span>
           </p>
           <div
             class="mt-2 rounded-md border border-black/[0.06] bg-[#f7f7f7] px-3 py-2 text-neutral-600"

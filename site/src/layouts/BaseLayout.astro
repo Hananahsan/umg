@@ -7,12 +7,14 @@ interface Props {
 }
 
 const {
-  title = "Nura | The memory layer for AI agents",
+  title = "umg0 | The memory layer for AI agents",
   description =
     "Persistent hierarchical memory for AI agents. MCP-first, local-first. Retain, recall, reflect, and prune. Works with Claude Code, Cursor, Hermes, Cline, VS Code, and any MCP client.",
 } = Astro.props;
 
-const canonical = new URL(Astro.url.pathname, "https://nura.dev");
+const canonical = Astro.site
+  ? new URL(Astro.url.pathname, Astro.site).href
+  : Astro.url.pathname;
 ---
 
 <!doctype html>

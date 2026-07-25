@@ -6,20 +6,29 @@ import { bootstrapApp } from "./app.js";
 import { startMcpServer } from "./mcp/server.js";
 import { log } from "./util/log.js";
 
+/** Keep in sync with package.json version. */
+const VERSION = "0.2.1";
+
 function printHelp(): void {
   const help = `
-umg — Unified Memory Gateway (v0.2)
+umg0 — Unified Memory Gateway (v${VERSION})
+
+Start MCP (preferred):
+  npx -y @umg0/umg0 mcp
+  umg0 mcp                 # after: npm i -g @umg0/umg0  (or npm i -g . from a clone)
+  node dist/index.js mcp   # from-source fallback
 
 Usage:
-  umg mcp              Start MCP server on stdio (default)
-  umg prune [--dry-run] [--aggressive] [--namespace <ns>]
-  umg stats
-  umg compact [--export-archives]
-  umg retain --content "..." [--tier semantic] [--namespace global]
-  umg recall --query "..." [--limit 8]
-  umg reflect --text "..."
-  umg promote --ids id1,id2 [--title "..."] [--dry-run]
-  umg help
+  umg0 mcp              Start MCP server on stdio (default)
+  umg0 prune [--dry-run] [--aggressive] [--namespace <ns>]
+  umg0 stats
+  umg0 compact [--export-archives]
+  umg0 retain --content "..." [--tier semantic] [--namespace global]
+  umg0 recall --query "..." [--limit 8]
+  umg0 reflect --text "..."
+  umg0 promote --ids id1,id2 [--title "..."] [--dry-run]
+  umg0 version
+  umg0 help
 
 Env:
   UMG_DB_PATH          SQLite path (default ~/.umg/memory.db)
@@ -36,6 +45,10 @@ Single-writer: one process per DB file. Share one MCP server across clients.
   process.stderr.write(help + "\n");
 }
 
+function printVersion(): void {
+  process.stdout.write(`umg0 ${VERSION}\n`);
+}
+
 function getFlag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
   if (i >= 0 && args[i + 1]) return args[i + 1];
@@ -48,13 +61,25 @@ function hasFlag(args: string[], name: string): boolean {
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const cmd = argv[0] && !argv[0].startsWith("-") ? argv[0] : "mcp";
-  const args = cmd === argv[0] ? argv.slice(1) : argv;
 
-  if (cmd === "help" || cmd === "--help" || cmd === "-h") {
+  // Version / help before bootstrap (no DB open)
+  if (
+    argv[0] === "version" ||
+    argv[0] === "--version" ||
+    argv[0] === "-V" ||
+    hasFlag(argv, "--version") ||
+    hasFlag(argv, "-V")
+  ) {
+    printVersion();
+    return;
+  }
+  if (argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h") {
     printHelp();
     return;
   }
+
+  const cmd = argv[0] && !argv[0].startsWith("-") ? argv[0] : "mcp";
+  const args = cmd === argv[0] ? argv.slice(1) : argv;
 
   const dbPath = getFlag(args, "--db") ?? process.env.UMG_DB_PATH;
   const skipStartupPrune =

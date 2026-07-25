@@ -2,11 +2,16 @@
 import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 
+import react from '@astrojs/react';
+
 // https://astro.build/config
+// Set `site` to your production origin when you have a domain (brand: umg0).
 export default defineConfig({
-  site: 'https://nura.dev',
   output: 'static',
+
   vite: {
     plugins: [tailwindcss()],
   },
+
+  integrations: [react()],
 });

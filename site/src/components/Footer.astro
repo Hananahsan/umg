@@ -1,5 +1,6 @@
 ---
 import { ARCHITECTURE, DOCS, EXAMPLES, GITHUB, LICENSE } from "../lib/links";
+import BrandLogo from "./BrandLogo";
 
 const year = new Date().getFullYear();
 
@@ -72,17 +73,9 @@ const columns = [
           href="/"
           class="inline-flex items-center gap-2.5 text-white no-underline"
         >
-          <span
-            class="flex h-3.5 w-2.5 flex-col justify-between"
-            aria-hidden="true"
-          >
-            <span class="h-px w-full bg-accent"></span>
-            <span class="h-px w-full bg-accent/80"></span>
-            <span class="h-px w-full bg-accent/55"></span>
-            <span class="h-px w-full bg-accent/30"></span>
-          </span>
+          <BrandLogo client:visible size={20} theme="dark" />
           <span class="font-display text-sm font-semibold tracking-tight"
-            >Nura</span
+            >umg0</span
           >
         </a>
         <p class="mt-4 max-w-xs text-sm leading-relaxed text-white/65">
@@ -90,34 +83,54 @@ const columns = [
         </p>
 
         <ul
-          class="mt-6 flex flex-wrap items-center gap-4"
+          class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2"
           aria-label="Works with"
         >
           <li class="flex items-center gap-1.5 text-xs text-white/55">
             <img
               src="/logos/claude.svg"
               alt=""
-              class="h-3.5 w-3.5 opacity-90"
+              class="h-3.5 w-3.5"
               width="14"
               height="14"
             />
-            Any MCP client
+            Claude
+          </li>
+          <li class="flex items-center gap-1.5 text-xs text-white/55">
+            <img
+              src="/logos/cursor.svg"
+              alt=""
+              class="h-3.5 w-3.5"
+              width="14"
+              height="14"
+            />
+            Cursor
+          </li>
+          <li class="flex items-center gap-1.5 text-xs text-white/55">
+            <img
+              src="/logos/hermes-mark.png"
+              alt=""
+              class="h-3.5 w-3.5 rounded-sm object-cover"
+              width="14"
+              height="14"
+            />
+            Hermes
           </li>
           <li class="flex items-center gap-1.5 text-xs text-white/55">
             <img
               src="/logos/mcp.svg"
               alt=""
-              class="h-3.5 w-3.5 opacity-90"
+              class="h-3.5 w-3.5"
               width="14"
               height="14"
             />
-            stdio MCP
+            MCP
           </li>
           <li class="flex items-center gap-1.5 text-xs text-white/55">
             <img
               src="/logos/github.svg"
               alt=""
-              class="h-3.5 w-3.5 opacity-90"
+              class="h-3.5 w-3.5"
               width="14"
               height="14"
             />
@@ -154,7 +167,7 @@ const columns = [
     <div
       class="mt-14 flex flex-col gap-3 border-t border-white/15 pt-8 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p class="text-sm text-white/45">© {year} Nura. Open source under MIT.</p>
+      <p class="text-sm text-white/45">© {year} umg0. Open source under MIT.</p>
       <p class="text-sm text-white/45">
         Product brand for{" "}
         <a href={GITHUB} class="text-white/70 transition-colors hover:text-white"

@@ -16,7 +16,8 @@ const tools: Array<{
   },
   {
     name: "Hermes",
-    logo: "/logos/hermes.svg",
+    logo: "/logos/hermes-mark.png",
+    href: "https://hermes-agent.nousresearch.com",
   },
   {
     name: "Cline / Roo",
@@ -64,7 +65,10 @@ const tools: Array<{
                   alt=""
                   width="18"
                   height="18"
-                  class="h-[18px] w-[18px] object-contain"
+                  class:list={[
+                    "h-[18px] w-[18px]",
+                    tool.name === "Hermes" ? "rounded-sm object-cover" : "object-contain",
+                  ]}
                 />
                 <span>{tool.name}</span>
               </a>
@@ -75,7 +79,10 @@ const tools: Array<{
                   alt=""
                   width="18"
                   height="18"
-                  class="h-[18px] w-[18px] object-contain"
+                  class:list={[
+                    "h-[18px] w-[18px]",
+                    tool.name === "Hermes" ? "rounded-sm object-cover" : "object-contain",
+                  ]}
                 />
                 <span>{tool.name}</span>
               </span>

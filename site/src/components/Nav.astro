@@ -1,5 +1,6 @@
 ---
 import { DOCS, GITHUB } from "../lib/links";
+import BrandLogo from "./BrandLogo";
 ---
 
 <header
@@ -13,16 +14,11 @@ import { DOCS, GITHUB } from "../lib/links";
       <a
         href="/"
         class="flex items-center gap-2.5 text-black no-underline"
-        aria-label="Nura home"
+        aria-label="umg0 home"
       >
-        <span class="flex h-3.5 w-2.5 flex-col justify-between" aria-hidden="true">
-          <span class="h-px w-full bg-accent"></span>
-          <span class="h-px w-full bg-accent/80"></span>
-          <span class="h-px w-full bg-accent/55"></span>
-          <span class="h-px w-full bg-accent/30"></span>
-        </span>
+        <BrandLogo client:load size={20} theme="light" />
         <span class="font-display text-[0.95rem] font-semibold tracking-tight"
-          >Nura</span
+          >umg0</span
         >
       </a>
 
@@ -53,18 +49,18 @@ import { DOCS, GITHUB } from "../lib/links";
     <div class="flex items-center gap-2">
       <a
         href={GITHUB}
-        class="hidden items-center gap-2 rounded-md border border-black/10 px-3 py-1.5 text-sm text-neutral-600 transition-colors hover:border-black/20 hover:text-black sm:inline-flex"
+        class="btn-ghost hidden !h-8 !px-3 !text-xs sm:inline-flex"
       >
         <img
           src="/logos/github-dark.svg"
           alt=""
-          class="h-4 w-4"
-          width="16"
-          height="16"
+          class="h-3.5 w-3.5"
+          width="14"
+          height="14"
         />
         <span>GitHub</span>
       </a>
-      <a href={DOCS} class="btn-primary">Get Started</a>
+      <a href={DOCS} class="btn-primary !h-8 !px-3.5 !text-xs">Get Started</a>
     </div>
   </nav>
 </header>

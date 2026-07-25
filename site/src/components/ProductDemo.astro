@@ -1,6 +1,4 @@
 ---
-import MemoryOrb from "./MemoryOrb";
-
 const tiers = [
   {
     name: "working",
@@ -92,25 +90,16 @@ const memories = [
           class="flex items-center justify-between border-b border-white/10 px-4 py-3"
         >
           <div class="flex items-center gap-3">
-            <span class="font-display text-sm font-semibold text-white">Nura</span>
+            <span class="font-display text-sm font-semibold text-white">umg0</span>
             <span
               class="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[0.625rem] text-neutral-500"
               >namespace · global</span
             >
           </div>
-          <!-- searching orb = live recall over the memory store -->
-          <div class="flex items-center gap-2">
-            <MemoryOrb
-              client:visible
-              size={20}
-              theme="dark"
-              speed={0.35}
-              label="Recalling from hierarchical memory"
-            />
-            <span class="font-mono text-[0.6875rem] text-neutral-500"
-              >recall</span
-            >
-          </div>
+          <span class="flex items-center gap-1.5 text-xs text-neutral-500">
+            <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
+            local sqlite · WAL
+          </span>
         </div>
 
         <div class="grid border-b border-white/10 sm:grid-cols-4">

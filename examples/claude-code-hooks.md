@@ -1,23 +1,32 @@
-# Claude Code hooks — UMG write-back
+# Claude Code hooks — umg0 write-back
 
 UMG does not silently store full transcripts. The portable write-back primitive is **`reflect`**.  
 Claude Code can call that at session end via a **Stop** (or SessionEnd) hook.
 
 ## 1. MCP server
 
-Ensure UMG is registered (see `examples/claude-code.mcp.json`):
+Ensure umg0 is registered (see `examples/claude-code.mcp.json`):
 
 ```json
 {
   "mcpServers": {
     "umg": {
-      "command": "node",
-      "args": ["/Users/hananahsan/umg/dist/index.js", "mcp"],
+      "command": "npx",
+      "args": ["-y", "@umg0/umg0", "mcp"],
       "env": {
-        "UMG_DB_PATH": "/Users/hananahsan/.umg/memory.db"
+        "UMG_LOG_LEVEL": "info"
       }
     }
   }
+}
+```
+
+Faster cold start after `npm i -g @umg0/umg0` (or `npm i -g .` from a clone):
+
+```json
+{
+  "command": "umg0",
+  "args": ["mcp"]
 }
 ```
 
@@ -31,7 +40,16 @@ Create `~/.umg/hooks/session-end-reflect.sh`:
 # Claude Code Stop hooks receive JSON on stdin; we keep this simple and optional.
 set -euo pipefail
 
-UMG_BIN="${UMG_BIN:-/Users/hananahsan/umg/dist/index.js}"
+# Prefer global bin; fall back to npx; override with UMG0_BIN if needed
+UMG0_BIN="${UMG0_BIN:-}"
+if [[ -z "$UMG0_BIN" ]]; then
+  if command -v umg0 >/dev/null 2>&1; then
+    UMG0_BIN="umg0"
+  else
+    UMG0_BIN="npx -y @umg0/umg0"
+  fi
+fi
+
 DB="${UMG_DB_PATH:-$HOME/.umg/memory.db}"
 NS="${UMG_NAMESPACE:-global}"
 
@@ -45,7 +63,9 @@ else
   TEXT="Session end: prefer agent-driven reflect via MCP with real decisions/preferences."
 fi
 
-node "$UMG_BIN" reflect --text "$TEXT" --namespace "$NS" 2>/dev/null || true
+export UMG_DB_PATH="$DB"
+# shellcheck disable=SC2086
+$UMG0_BIN reflect --text "$TEXT" --namespace "$NS" 2>/dev/null || true
 ```
 
 ```bash
@@ -62,7 +82,7 @@ Example Claude Code settings hook fragment (`~/.claude/settings.json` or project
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/YOUR_USER/.umg/hooks/session-end-reflect.sh"
+            "command": "$HOME/.umg/hooks/session-end-reflect.sh"
           }
         ]
       }
@@ -71,7 +91,7 @@ Example Claude Code settings hook fragment (`~/.claude/settings.json` or project
 }
 ```
 
-> Hook shapes evolve with Claude Code. Prefer the agent calling MCP `reflect` with real session bullets when possible — that is higher quality than a generic shell fallback.
+> Hook shapes evolve with Claude Code. Prefer the agent calling MCP `reflect` with real session bullets when possible — that is higher quality than a generic shell fallback. See [session-end.md](./session-end.md).
 
 ## 3. Recommended agent pattern (primary)
 
@@ -95,4 +115,4 @@ At the start of a coding session:
 recall(query: "<project> <task>", namespace: "project:<name>")
 ```
 
-Or load the MCP prompt `session-start` with project/task args.
+Or load the MCP prompt `session-start` with project/task args. See [session-start.md](./session-start.md).
