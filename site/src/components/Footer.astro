@@ -32,29 +32,105 @@ const columns = [
 ];
 ---
 
-<footer class="border-t border-border bg-bg-elevated/30">
-  <div class="container-content py-14">
-    <div class="grid gap-10 md:grid-cols-[1.2fr_2fr]">
+<footer class="relative overflow-hidden border-t border-black/10">
+  <!-- Full-bleed landscape -->
+  <div class="absolute inset-0" aria-hidden="true">
+    <img
+      src="/images/footer-bridge.jpg"
+      alt=""
+      width="1280"
+      height="800"
+      loading="lazy"
+      decoding="async"
+      class="h-full w-full object-cover object-center"
+    />
+    <!-- Keep the arch readable: light top, stronger base for type -->
+    <div
+      class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/20"
+    >
+    </div>
+    <div
+      class="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/30"
+    >
+    </div>
+  </div>
+
+  <div class="container-content relative z-10 py-16 md:py-20">
+    <!-- Closing line sits in the sky / mist zone -->
+    <p
+      class="font-display max-w-xl text-[clamp(1.5rem,3.5vw,2.25rem)] font-semibold leading-snug tracking-[-0.03em] text-white text-balance"
+    >
+      Memory that spans sessions.
+      <span class="mt-1 block font-normal text-white/70"
+        >A bridge across context.</span
+      >
+    </p>
+
+    <div class="mt-14 grid gap-12 md:grid-cols-[1.15fr_2fr] md:gap-16">
       <div>
-        <a href="/" class="inline-flex items-center gap-2.5 text-text no-underline">
-          <span class="flex h-3.5 w-2.5 flex-col justify-between" aria-hidden="true">
+        <a
+          href="/"
+          class="inline-flex items-center gap-2.5 text-white no-underline"
+        >
+          <span
+            class="flex h-3.5 w-2.5 flex-col justify-between"
+            aria-hidden="true"
+          >
             <span class="h-px w-full bg-accent"></span>
-            <span class="h-px w-full bg-accent/70"></span>
-            <span class="h-px w-full bg-accent/45"></span>
-            <span class="h-px w-full bg-accent/25"></span>
+            <span class="h-px w-full bg-accent/80"></span>
+            <span class="h-px w-full bg-accent/55"></span>
+            <span class="h-px w-full bg-accent/30"></span>
           </span>
-          <span class="font-display text-sm font-semibold tracking-tight">Nura</span>
+          <span class="font-display text-sm font-semibold tracking-tight"
+            >Nura</span
+          >
         </a>
-        <p class="mt-4 max-w-xs text-sm leading-relaxed text-text-muted">
+        <p class="mt-4 max-w-xs text-sm leading-relaxed text-white/65">
           The memory layer for AI agents. Persistent. Hierarchical. Clean.
         </p>
+
+        <ul
+          class="mt-6 flex flex-wrap items-center gap-4"
+          aria-label="Works with"
+        >
+          <li class="flex items-center gap-1.5 text-xs text-white/55">
+            <img
+              src="/logos/claude.svg"
+              alt=""
+              class="h-3.5 w-3.5 opacity-90"
+              width="14"
+              height="14"
+            />
+            Any MCP client
+          </li>
+          <li class="flex items-center gap-1.5 text-xs text-white/55">
+            <img
+              src="/logos/mcp.svg"
+              alt=""
+              class="h-3.5 w-3.5 opacity-90"
+              width="14"
+              height="14"
+            />
+            stdio MCP
+          </li>
+          <li class="flex items-center gap-1.5 text-xs text-white/55">
+            <img
+              src="/logos/github.svg"
+              alt=""
+              class="h-3.5 w-3.5 opacity-90"
+              width="14"
+              height="14"
+            />
+            GitHub
+          </li>
+        </ul>
       </div>
 
       <div class="grid grid-cols-2 gap-8 sm:grid-cols-3">
         {
           columns.map((col) => (
             <div>
-              <p class="text-xs font-medium uppercase tracking-[0.14em] text-text-faint">
+              <p class="text-xs font-medium uppercase tracking-[0.14em] text-white/45">
                 {col.title}
               </p>
               <ul class="mt-4 space-y-2.5">
@@ -62,7 +138,7 @@ const columns = [
                   <li>
                     <a
                       href={link.href}
-                      class="text-sm text-text-muted transition-colors hover:text-text"
+                      class="text-sm text-white/70 transition-colors hover:text-white"
                     >
                       {link.label}
                     </a>
@@ -76,12 +152,14 @@ const columns = [
     </div>
 
     <div
-      class="mt-12 flex flex-col gap-3 border-t border-border pt-8 sm:flex-row sm:items-center sm:justify-between"
+      class="mt-14 flex flex-col gap-3 border-t border-white/15 pt-8 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p class="text-sm text-text-faint">© {year} Nura. Open source under MIT.</p>
-      <p class="text-sm text-text-faint">
+      <p class="text-sm text-white/45">© {year} Nura. Open source under MIT.</p>
+      <p class="text-sm text-white/45">
         Product brand for{" "}
-        <a href={GITHUB} class="text-text-muted hover:text-text">UMG</a>
+        <a href={GITHUB} class="text-white/70 transition-colors hover:text-white"
+          >UMG</a
+        >
       </p>
     </div>
   </div>

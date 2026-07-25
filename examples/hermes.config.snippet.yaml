@@ -1,0 +1,27 @@
+# Hermes Agent — UMG MCP server snippet
+# Merge into your Hermes MCP / agent configuration.
+# Replace paths with your local umg clone and preferred DB location.
+#
+# Docs vary by Hermes version; the important part is stdio:
+#   command + args + optional env
+
+mcp_servers:
+  umg:
+    command: node
+    args:
+      - /absolute/path/to/umg/dist/index.js
+      - mcp
+    env:
+      UMG_DB_PATH: /absolute/path/to/home/.umg/memory.db
+      UMG_LOG_LEVEL: info
+
+# Equivalent idea (some hosts use this JSON shape instead):
+# {
+#   "mcpServers": {
+#     "umg": {
+#       "command": "node",
+#       "args": ["/absolute/path/to/umg/dist/index.js", "mcp"],
+#       "env": { "UMG_DB_PATH": "/absolute/path/to/home/.umg/memory.db" }
+#     }
+#   }
+# }

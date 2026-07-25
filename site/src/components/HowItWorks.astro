@@ -3,41 +3,37 @@ const steps = [
   {
     n: "01",
     title: "Retain",
-    body: "Write durable facts, preferences, and decisions. Auto-tier or set semantic / working explicitly.",
+    body: "Write durable facts, preferences, and decisions. Auto-tier or set semantic / working explicitly. Similar facts merge; clear contradictions supersede.",
   },
   {
     n: "02",
     title: "Recall",
-    body: "Retrieve ranked context for the current task. Multi-factor re-rank: FTS, importance, decay, tier, recency.",
+    body: "Retrieve ranked context for the current task. Configurable multi-factor score: FTS, importance, decay, tier, recency, entity.",
   },
   {
     n: "03",
     title: "Reflect",
-    body: "Session write-back consolidates decisions and preferences. Optional LLM reflect behind a flag.",
+    body: "Session write-back consolidates decisions and preferences. Heuristic extract by default; optional LLM reflect behind a flag.",
   },
   {
     n: "04",
     title: "Prune & promote",
-    body: "Scores and caps keep the store clean. Repeated patterns can promote into procedural skills.",
+    body: "Scores and caps keep the store clean. Multi-pass merge on prune. Patterns can promote to procedural skills with quality gates.",
   },
 ];
 ---
 
-<section
-  class="section-pad border-t border-border bg-bg-elevated/40"
-  id="how"
-  aria-labelledby="how-heading"
->
+<section class="section-pad border-0 bg-white" id="how" aria-labelledby="how-heading">
   <div class="container-content">
     <div class="max-w-2xl">
       <p class="eyebrow mb-4">How it works</p>
       <h2
         id="how-heading"
-        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text"
+        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-black"
       >
         A disciplined write path.
       </h2>
-      <p class="mt-5 text-base leading-relaxed text-text-muted">
+      <p class="mt-5 text-base leading-relaxed text-neutral-500">
         Useful agent memory is not a bigger store. It is hierarchical retention
         plus aggressive consolidation.
       </p>
@@ -48,12 +44,10 @@ const steps = [
         steps.map((step) => (
           <li class="panel relative p-6">
             <span class="font-mono text-xs text-accent">{step.n}</span>
-            <h3 class="mt-4 font-display text-base font-semibold tracking-tight text-text">
+            <h3 class="mt-4 font-display text-base font-semibold tracking-tight text-black">
               {step.title}
             </h3>
-            <p class="mt-2 text-sm leading-relaxed text-text-muted">
-              {step.body}
-            </p>
+            <p class="mt-2 text-sm leading-relaxed text-neutral-500">{step.body}</p>
           </li>
         ))
       }

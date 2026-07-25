@@ -4,36 +4,52 @@ const features = [
     eyebrow: "Hierarchy",
     title: "Four tiers. Clear retention.",
     body: "Working for scratch, episodic for interactions, semantic for durable facts, procedural for skills. Each tier has its own TTL, cap, and decay half-life.",
-    points: ["Auto-tier or explicit tier on write", "Tier priors in recall ranking", "Procedural protected by default"],
+    points: [
+      "Auto-tier or explicit tier on write",
+      "Tier weight in configurable ranking",
+      "Procedural protected from eviction by default",
+    ],
     visual: "hierarchy",
   },
   {
     eyebrow: "Consolidation",
     title: "Memory that stays sharp.",
-    body: "Importance scoring, merge/dedup, contradiction supersede, time+access decay, and eviction under pressure. The differentiator is pruning quality — not store size.",
-    points: ["Merge similar · supersede conflicts", "Decay from age and access", "Caps with score floors"],
+    body: "Importance from entity density and rarity, multi-pass merge, confidence-gated supersede (additive-first on ambiguity), tunable decay, and eviction under pressure. The differentiator is pruning quality, not store size.",
+    points: [
+      "Merge similar; supersede only when clear (≥0.75)",
+      "Decay with session-recency boost",
+      "Promotion quality gates + proposed skills dry-run",
+    ],
     visual: "consolidate",
   },
   {
     eyebrow: "Interface",
     title: "MCP-first. Local-first.",
-    body: "Standard tools agents already understand. SQLite + FTS5 offline by default. Optional LLM reflect behind a flag. No cloud dependency to start.",
-    points: ["stdio MCP server", "CLI for retain / recall / prune", "Works with Claude Code & Cursor"],
+    body: "Six tools agents already understand. SQLite FTS5 offline by default, WAL and single-writer discipline. Optional hybrid embeddings and LLM reflect stay behind flags.",
+    points: [
+      "stdio MCP server + CLI (stats, compact, prune)",
+      "7-day metrics via umg stats / umg://stats",
+      "Works with any MCP client (Claude Code, Cursor, Hermes, Cline, VS Code, …)",
+    ],
     visual: "mcp",
   },
 ];
 ---
 
-<section class="section-pad border-t border-border" id="features" aria-labelledby="features-heading">
+<section class="section-pad border-0 border-t border-white/10 bg-transparent" id="features" aria-labelledby="features-heading">
   <div class="container-content">
     <div class="max-w-2xl">
       <p class="eyebrow mb-4">Why Nura</p>
       <h2
         id="features-heading"
-        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text"
+        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-white"
       >
         Infrastructure-grade agent memory.
       </h2>
+      <p class="mt-4 text-base leading-relaxed text-neutral-400">
+        Honest v0.2 scope: one excellent local backend, clean MemoryStore port,
+        multi-backend routing out of scope.
+      </p>
     </div>
 
     <div class="mt-16 space-y-20 md:space-y-28">
@@ -47,15 +63,15 @@ const features = [
           >
             <div>
               <p class="eyebrow mb-3">{f.eyebrow}</p>
-              <h3 class="font-display text-2xl font-semibold tracking-tight text-text md:text-[1.75rem]">
+              <h3 class="font-display text-2xl font-semibold tracking-tight text-white md:text-[1.75rem]">
                 {f.title}
               </h3>
-              <p class="mt-4 text-base leading-relaxed text-text-muted">
+              <p class="mt-4 text-base leading-relaxed text-neutral-400">
                 {f.body}
               </p>
               <ul class="mt-6 space-y-2">
                 {f.points.map((p) => (
-                  <li class="flex items-center gap-2.5 text-sm text-text-muted">
+                  <li class="flex items-center gap-2.5 text-sm text-neutral-400">
                     <span class="h-px w-3 bg-accent/70" />
                     {p}
                   </li>
@@ -63,7 +79,7 @@ const features = [
               </ul>
             </div>
 
-            <div class="panel overflow-hidden p-6 md:p-8">
+            <div class="overflow-hidden rounded-xl border border-white/10 bg-[#111] p-6 md:p-8">
               {f.visual === "hierarchy" && (
                 <div class="space-y-2">
                   {[
@@ -83,7 +99,7 @@ const features = [
                       </div>
                     </div>
                   ))}
-                  <p class="pt-4 font-mono text-[0.6875rem] text-text-faint">
+                  <p class="pt-4 font-mono text-[0.6875rem] text-neutral-500">
                     retention ↑ · pressure ↓
                   </p>
                 </div>
@@ -91,26 +107,29 @@ const features = [
 
               {f.visual === "consolidate" && (
                 <div class="font-mono text-[0.75rem] leading-relaxed">
-                  <p class="text-text-faint">// write path</p>
-                  <p class="mt-3 text-text-muted">
+                  <p class="text-neutral-500">// write path (v0.2)</p>
+                  <p class="mt-3 text-neutral-300">
                     <span class="text-accent">1.</span> score importance
                   </p>
-                  <p class="text-text-muted">
+                  <p class="text-neutral-300">
                     <span class="text-accent">2.</span> find similar
                   </p>
-                  <p class="ml-4 text-text-faint">
+                  <p class="ml-4 text-neutral-500">
                     → merge if similar ≥ 0.82
                   </p>
-                  <p class="ml-4 text-text-faint">
-                    → supersede on contradiction
+                  <p class="ml-4 text-neutral-500">
+                    → supersede only if confidence ≥ 0.75
                   </p>
-                  <p class="text-text-muted">
+                  <p class="ml-4 text-neutral-500">
+                    → else additive (keep both)
+                  </p>
+                  <p class="text-neutral-300">
                     <span class="text-accent">3.</span> insert + light prune
                   </p>
-                  <div class="mt-6 rounded-lg border border-border bg-bg px-4 py-3">
-                    <p class="text-text-faint">decay_score =</p>
-                    <p class="mt-1 text-text">
-                      importance × (0.65·time + 0.35·access)
+                  <div class="mt-6 rounded-lg border border-white/10 bg-black px-4 py-3">
+                    <p class="text-neutral-500">recall score =</p>
+                    <p class="mt-1 text-white">
+                      fts · imp · decay · tier · recency · entity
                     </p>
                   </div>
                 </div>
@@ -118,17 +137,17 @@ const features = [
 
               {f.visual === "mcp" && (
                 <div class="font-mono text-[0.75rem] leading-relaxed">
-                  <p class="text-text-faint">// .mcp.json</p>
-                  <pre class="mt-3 overflow-x-auto text-text-muted">{`{
+                  <p class="text-neutral-500">// .mcp.json</p>
+                  <pre class="mt-3 overflow-x-auto text-neutral-300">{`{
   "mcpServers": {
-    "nura": {
+    "umg": {
       "command": "node",
       "args": ["./dist/index.js", "mcp"]
     }
   }
 }`}</pre>
-                  <p class="mt-4 text-text-faint">
-                    # or: umg mcp · umg retain · umg recall
+                  <p class="mt-4 text-neutral-500">
+                    # umg stats · umg compact · umg prune --dry-run
                   </p>
                 </div>
               )}

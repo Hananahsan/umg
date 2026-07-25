@@ -15,17 +15,17 @@ const pains = [
 ];
 ---
 
-<section class="section-pad" id="problem" aria-labelledby="problem-heading">
+<section class="section-pad border-0 bg-white" id="problem" aria-labelledby="problem-heading">
   <div class="container-content">
     <div class="max-w-2xl">
       <p class="eyebrow mb-4">The problem</p>
       <h2
         id="problem-heading"
-        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text text-balance"
+        class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-black text-balance"
       >
-        What should be remembered gets forgotten — or never cleaned.
+        What should be remembered gets forgotten, or never cleaned.
       </h2>
-      <p class="mt-5 max-w-xl text-base leading-relaxed text-text-muted">
+      <p class="mt-5 max-w-xl text-base leading-relaxed text-neutral-500">
         Agent amnesia and unbounded memory bloat are two sides of the same
         infrastructure gap. Nura is the layer in between.
       </p>
@@ -35,11 +35,11 @@ const pains = [
       {
         pains.map((item, i) => (
           <article class="panel p-7">
-            <span class="font-mono text-xs text-accent/80">0{i + 1}</span>
-            <h3 class="mt-4 font-display text-base font-semibold tracking-tight text-text">
+            <span class="font-mono text-xs text-accent">0{i + 1}</span>
+            <h3 class="mt-4 font-display text-base font-semibold tracking-tight text-black">
               {item.title}
             </h3>
-            <p class="mt-2 text-sm leading-relaxed text-text-muted">{item.body}</p>
+            <p class="mt-2 text-sm leading-relaxed text-neutral-500">{item.body}</p>
           </article>
         ))
       }

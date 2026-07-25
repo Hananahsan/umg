@@ -7,9 +7,9 @@ interface Props {
 }
 
 const {
-  title = "Nura — The memory layer for AI agents",
+  title = "Nura | The memory layer for AI agents",
   description =
-    "Persistent hierarchical memory for AI agents. MCP-first, local-first. Retain, recall, reflect, and prune — built for Claude Code, Cursor, and any MCP client.",
+    "Persistent hierarchical memory for AI agents. MCP-first, local-first. Retain, recall, reflect, and prune. Works with Claude Code, Cursor, Hermes, Cline, VS Code, and any MCP client.",
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, "https://nura.dev");
@@ -22,7 +22,7 @@ const canonical = new URL(Astro.url.pathname, "https://nura.dev");
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#ffffff" />
     <link rel="canonical" href={canonical} />
 
     <meta property="og:type" content="website" />
@@ -51,7 +51,7 @@ const canonical = new URL(Astro.url.pathname, "https://nura.dev");
 
     <title>{title}</title>
   </head>
-  <body class="relative overflow-x-hidden">
+  <body class="relative overflow-x-hidden bg-white text-black">
     <div class="grain" aria-hidden="true"></div>
     <slot />
   </body>

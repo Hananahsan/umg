@@ -1,0 +1,39 @@
+---
+/**
+ * Lined type fill (reference: black bars through glyphs on white).
+ * CSS only — width follows real text metrics (no SVG overlap).
+ */
+interface Props {
+  text: string;
+  label?: string;
+  class?: string;
+  fill?: string;
+}
+
+const {
+  text,
+  label = text,
+  class: className = "",
+  fill = "#0a0a0a",
+} = Astro.props;
+
+const style = [
+  `--stripe: ${fill}`,
+  "display: inline",
+  "font: inherit",
+  "font-weight: inherit",
+  "letter-spacing: inherit",
+  "line-height: inherit",
+  "white-space: nowrap",
+  "vertical-align: baseline",
+  "color: transparent",
+  "-webkit-text-fill-color: transparent",
+  `background-image: repeating-linear-gradient(to bottom, ${fill} 0, ${fill} 0.095em, transparent 0.095em, transparent 0.19em)`,
+  "-webkit-background-clip: text",
+  "background-clip: text",
+].join("; ");
+---
+
+<span class:list={["striped-word", className]} style={style} aria-label={label}
+  >{text}</span
+>

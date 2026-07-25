@@ -3,48 +3,34 @@ import { DOCS, GITHUB } from "../lib/links";
 ---
 
 <section
-  class="relative overflow-hidden pt-16"
+  class="relative overflow-hidden bg-white pt-16"
   aria-labelledby="hero-heading"
 >
-  <div class="absolute inset-0" aria-hidden="true">
-    <img
-      src="/images/hero-bg.jpg"
-      alt=""
-      width="1280"
-      height="720"
-      fetchpriority="high"
-      decoding="async"
-      class="h-full w-full object-cover object-center opacity-45"
-    />
-    <div class="absolute inset-0 bg-gradient-to-b from-bg/50 via-bg/80 to-bg"></div>
-    <div class="absolute inset-0 bg-gradient-to-r from-bg via-bg/70 to-bg/40"></div>
-  </div>
-
   <div
     class="container-content relative z-10 grid items-center gap-12 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:py-28"
   >
     <div>
       <div
-        class="fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-white/[0.03] px-3 py-1"
+        class="fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 bg-black/[0.02] px-3 py-1"
       >
         <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
-        <span class="text-xs font-medium text-text-muted"
-          >MCP-first · Local-first · Open source</span
+        <span class="text-xs font-medium text-neutral-500"
+          >MCP-first · Local-first · Open source · v0.2</span
         >
       </div>
 
       <h1
         id="hero-heading"
-        class="fade-up fade-up-delay-1 font-display max-w-xl text-[clamp(2.5rem,5.5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-text text-balance"
+        class="fade-up fade-up-delay-1 font-display max-w-xl text-[clamp(2.5rem,5.5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-black text-balance"
       >
         The memory layer for AI agents
       </h1>
 
       <p
-        class="fade-up fade-up-delay-2 mt-6 max-w-lg text-lg leading-relaxed text-text-muted"
+        class="fade-up fade-up-delay-2 mt-6 max-w-lg text-lg leading-relaxed text-neutral-500"
       >
         Persistent hierarchical memory that agents can retain, recall, and prune.
-        Built for Claude Code, Cursor, and any MCP client.
+        One excellent local store. Clean MemoryStore port for later backends.
       </p>
 
       <div class="fade-up fade-up-delay-3 mt-9 flex flex-wrap items-center gap-3">
@@ -52,87 +38,117 @@ import { DOCS, GITHUB } from "../lib/links";
         <a href={GITHUB} class="btn-ghost">View on GitHub</a>
       </div>
 
-      <p class="fade-up fade-up-delay-3 mt-8 text-sm text-text-faint">
-        Drop-in via MCP. Offline by default. No cloud required.
+      <p class="fade-up fade-up-delay-3 mt-8 text-sm text-neutral-400">
+        Drop-in via MCP (stdio). Offline by default. No cloud required.
       </p>
+
+      <ul
+        class="fade-up fade-up-delay-3 mt-8 flex flex-wrap items-center gap-2"
+        aria-label="Works with"
+      >
+        <li class="logo-chip pointer-events-none">
+          <img src="/logos/claude.svg" alt="" width="16" height="16" />
+          <span>Claude Code</span>
+        </li>
+        <li class="logo-chip pointer-events-none">
+          <img src="/logos/cursor-dark.svg" alt="" width="16" height="16" />
+          <span>Cursor</span>
+        </li>
+        <li class="logo-chip pointer-events-none">
+          <img src="/logos/mcp-dark.svg" alt="" width="16" height="16" />
+          <span>Hermes</span>
+        </li>
+        <li class="logo-chip pointer-events-none">
+          <img src="/logos/mcp-dark.svg" alt="" width="16" height="16" />
+          <span>Cline</span>
+        </li>
+        <li class="logo-chip pointer-events-none">
+          <img src="/logos/mcp-dark.svg" alt="" width="16" height="16" />
+          <span>Any MCP client</span>
+        </li>
+      </ul>
     </div>
 
-    <!-- Product code panel -->
-    <div class="fade-up fade-up-delay-2 code-window">
+    <!-- Light session panel (matches white page) -->
+    <div
+      class="fade-up fade-up-delay-2 overflow-hidden rounded-xl border border-black/[0.08] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)]"
+    >
       <div
-        class="flex items-center justify-between border-b border-border px-4 py-3"
+        class="flex items-center justify-between border-b border-black/[0.06] bg-[#fafafa] px-4 py-3"
       >
         <div class="flex items-center gap-2">
-          <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
-          <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
-          <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
+          <span class="h-2.5 w-2.5 rounded-full bg-black/10"></span>
+          <span class="h-2.5 w-2.5 rounded-full bg-black/10"></span>
+          <span class="h-2.5 w-2.5 rounded-full bg-black/10"></span>
         </div>
-        <span class="font-mono text-[0.6875rem] text-text-faint"
+        <span class="font-mono text-[0.6875rem] text-neutral-400"
           >agent · session</span
         >
       </div>
 
-      <div class="space-y-4 p-5 font-mono text-[0.8125rem] leading-relaxed">
+      <div
+        class="space-y-4 p-5 font-mono text-[0.8125rem] leading-relaxed text-neutral-600"
+      >
         <div>
-          <p class="text-text-faint"># Session start — restore context</p>
+          <p class="text-neutral-400"># Session start: restore context</p>
           <p class="mt-1">
             <span class="text-accent">→</span>
-            <span class="text-text">recall</span>
-            <span class="text-text-muted">("nura landing page")</span>
+            <span class="text-black">recall</span>
+            <span class="text-neutral-500">("nura landing page")</span>
           </p>
           <div
-            class="mt-2 rounded-md border border-border bg-white/[0.02] px-3 py-2 text-text-muted"
+            class="mt-2 rounded-md border border-black/[0.06] bg-[#f7f7f7] px-3 py-2 text-neutral-600"
           >
-            <p class="text-accent/90">semantic</p>
+            <p class="text-accent">semantic</p>
             <p>Prefer TypeScript strict mode</p>
-            <p class="mt-2 text-accent/90">procedural</p>
+            <p class="mt-2 text-accent">procedural</p>
             <p>Always dry-run prune before eviction</p>
           </div>
         </div>
 
         <div>
-          <p class="text-text-faint"># New durable fact</p>
+          <p class="text-neutral-400"># New durable fact</p>
           <p class="mt-1">
             <span class="text-accent">→</span>
-            <span class="text-text">retain</span>
-            <span class="text-text-muted"
+            <span class="text-black">retain</span>
+            <span class="text-neutral-500"
               >("Brand accent is soft violet #C4B5FD", tier:
               <span class="text-accent">"semantic"</span>)</span
             >
           </p>
-          <p class="mt-1 text-text-faint">✓ stored · importance 0.82</p>
+          <p class="mt-1 text-neutral-400">✓ stored · importance scored</p>
         </div>
 
         <div>
-          <p class="text-text-faint"># Session end</p>
+          <p class="text-neutral-400"># Session end</p>
           <p class="mt-1">
             <span class="text-accent">→</span>
-            <span class="text-text">reflect</span>
-            <span class="text-text-muted">("decisions + prefs from session")</span>
+            <span class="text-black">reflect</span>
+            <span class="text-neutral-500">("decisions + prefs from session")</span>
           </p>
-          <p class="mt-1 text-text-faint">✓ consolidated · 3 memories retained</p>
+          <p class="mt-1 text-neutral-400">✓ consolidated · candidates retained</p>
         </div>
       </div>
 
       <div
-        class="grid grid-cols-3 gap-px border-t border-border bg-border text-center"
+        class="grid grid-cols-3 gap-px border-t border-black/[0.06] bg-black/[0.04] text-center"
       >
-        <div class="bg-bg px-3 py-3">
-          <p class="font-mono text-sm font-medium text-text">4</p>
-          <p class="mt-0.5 text-[0.625rem] uppercase tracking-wider text-text-faint">
+        <div class="bg-[#fafafa] px-3 py-3">
+          <p class="font-mono text-sm font-medium text-black">4</p>
+          <p class="mt-0.5 text-[0.625rem] uppercase tracking-wider text-neutral-400">
             Tiers
           </p>
         </div>
-        <div class="bg-bg px-3 py-3">
-          <p class="font-mono text-sm font-medium text-text">MCP</p>
-          <p class="mt-0.5 text-[0.625rem] uppercase tracking-wider text-text-faint">
-            Interface
+        <div class="bg-[#fafafa] px-3 py-3">
+          <p class="font-mono text-sm font-medium text-black">6</p>
+          <p class="mt-0.5 text-[0.625rem] uppercase tracking-wider text-neutral-400">
+            MCP tools
           </p>
         </div>
-        <div class="bg-bg px-3 py-3">
-          <p class="font-mono text-sm font-medium text-accent">Live</p>
-          <p class="mt-0.5 text-[0.625rem] uppercase tracking-wider text-text-faint">
-            Local SQLite
+        <div class="bg-[#fafafa] px-3 py-3">
+          <p class="font-mono text-sm font-medium text-accent">FTS</p>
+          <p class="mt-0.5 text-[0.625rem] uppercase tracking-wider text-neutral-400">
+            SQLite local
           </p>
         </div>
       </div>

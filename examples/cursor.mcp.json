@@ -2,9 +2,10 @@
   "mcpServers": {
     "umg": {
       "command": "node",
-      "args": ["/Users/hananahsan/umg/dist/index.js", "mcp"],
+      "args": ["/absolute/path/to/umg/dist/index.js", "mcp"],
       "env": {
-        "UMG_DB_PATH": "/Users/hananahsan/.umg/memory.db"
+        "UMG_DB_PATH": "/absolute/path/to/home/.umg/memory.db",
+        "UMG_LOG_LEVEL": "info"
       }
     }
   }

@@ -21,6 +21,10 @@ Agents ──MCP stdio──► Interface (tools/resources)
                  SqliteMemoryStore (v1)
 ```
 
+### Client interface
+
+UMG exposes **MCP over stdio**. Any MCP-compatible host can connect (Claude Code, Cursor, Hermes, Cline/Roo, VS Code + Copilot, Zed, Windsurf, ChatGPT Developer Mode where MCP is enabled, and others). The protocol surface is the contract; client lists in marketing are illustrative. **Remote/HTTP MCP transport is future work** and is not claimed in v0.2.
+
 **Rules**
 
 - MCP handlers never touch SQL.

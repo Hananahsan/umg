@@ -1,33 +1,56 @@
 ---
 import { DOCS, GITHUB } from "../lib/links";
+import StripedText from "./StripedText.astro";
 ---
 
 <section
-  class="relative section-pad overflow-hidden border-t border-border"
+  class="relative overflow-hidden border-0 bg-white"
   aria-labelledby="cta-heading"
 >
-  <div class="pointer-events-none absolute inset-0" aria-hidden="true">
-    <div
-      class="absolute left-1/2 top-1/2 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/10 blur-[120px]"
-    >
-    </div>
-  </div>
+  <div class="container-content relative z-10 py-24 text-center md:py-28">
+    <p class="eyebrow mb-6">Get started</p>
 
-  <div class="container-content relative z-10 text-center">
-    <p class="eyebrow mb-4">Get started</p>
-    <h2
-      id="cta-heading"
-      class="font-display mx-auto max-w-2xl text-[clamp(1.875rem,4vw,2.75rem)] font-semibold tracking-[-0.03em] text-text text-balance"
-    >
-      Give your agents a memory that lasts.
+    <h2 id="cta-heading" class="cta-headline font-display mx-auto text-black">
+      Give your agents a <StripedText text="memory" fill="#0a0a0a" /> that lasts.
     </h2>
-    <p class="mx-auto mt-5 max-w-md text-base leading-relaxed text-text-muted">
+
+    <p
+      class="mx-auto mt-8 max-w-md text-base leading-relaxed text-neutral-500 md:text-lg"
+    >
       Persistent. Hierarchical. Clean. Install locally and connect via MCP in
       minutes.
     </p>
-    <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+    <div class="mt-12 flex flex-wrap items-center justify-center gap-3">
       <a href={DOCS} class="btn-primary">Start building</a>
-      <a href={GITHUB} class="btn-ghost">Star on GitHub</a>
+      <a href={GITHUB} class="btn-ghost">
+        <span class="inline-flex items-center gap-2">
+          <img
+            src="/logos/github-dark.svg"
+            alt=""
+            class="h-4 w-4"
+            width="16"
+            height="16"
+          />
+          Star on GitHub
+        </span>
+      </a>
     </div>
   </div>
 </section>
+
+<style>
+  .cta-headline {
+    max-width: 18ch;
+    font-size: clamp(2.25rem, 6.5vw, 4rem);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+
+  @media (min-width: 768px) {
+    .cta-headline {
+      max-width: 22ch;
+    }
+  }
+</style>

@@ -17,12 +17,19 @@ import Footer from "../components/Footer.astro";
 <BaseLayout>
   <Nav />
   <main>
+    <!-- Full-page white theme -->
     <Hero />
     <Integrations />
     <Stats />
     <Problem />
-    <ProductDemo />
-    <Features />
+
+    <!-- Single black band: product pattern break -->
+    <div class="section-dark">
+      <ProductDemo />
+      <Features />
+    </div>
+
+    <!-- Back to white -->
     <HowItWorks />
     <Code />
     <UseCases />

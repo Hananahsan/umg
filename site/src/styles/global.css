@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Avantt — self-hosted from public/fonts */
+/* Avantt: self-hosted from public/fonts */
 @font-face {
   font-family: "Avantt";
   src: url("/fonts/Avantt-Light.otf") format("opentype");
@@ -41,7 +41,6 @@
   font-display: swap;
 }
 
-/* Variable font fallback for intermediate weights */
 @font-face {
   font-family: "Avantt VF";
   src: url("/fonts/AvanttVF.ttf") format("truetype");
@@ -51,20 +50,28 @@
 }
 
 @theme {
-  /* Black / white / soft violet (lavender) */
-  --color-bg: #000000;
-  --color-bg-elevated: #0a0a0a;
-  --color-surface: #111111;
-  --color-surface-2: #161616;
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-border-strong: rgba(255, 255, 255, 0.18);
-  --color-text: #ffffff;
-  --color-text-muted: #a3a3a3;
-  --color-text-faint: #6b6b6b;
+  /* Default page = white. Dark tokens kept for the single black band. */
+  --color-bg: #ffffff;
+  --color-bg-elevated: #f7f7f7;
+  --color-surface: #fafafa;
+  --color-surface-2: #f0f0f0;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-strong: rgba(0, 0, 0, 0.14);
+  --color-text: #0a0a0a;
+  --color-text-muted: #525252;
+  --color-text-faint: #737373;
   --color-accent: #c4b5fd;
-  --color-accent-dim: rgba(196, 181, 253, 0.14);
-  --color-accent-hover: #ddd6fe;
+  --color-accent-dim: rgba(196, 181, 253, 0.16);
+  --color-accent-hover: #a78bfa;
   --color-accent-glow: rgba(196, 181, 253, 0.22);
+
+  --color-dark: #000000;
+  --color-dark-elevated: #0a0a0a;
+  --color-dark-surface: #111111;
+  --color-dark-border: rgba(255, 255, 255, 0.1);
+  --color-dark-text: #ffffff;
+  --color-dark-muted: #a3a3a3;
+  --color-dark-faint: #6b6b6b;
 
   --font-display: "Avantt", "Avantt VF", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Avantt", "Avantt VF", ui-sans-serif, system-ui, sans-serif;
@@ -98,7 +105,7 @@
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 45%, transparent);
     color: var(--color-text);
   }
 
@@ -122,7 +129,7 @@
 
   @media (min-width: 768px) {
     .container-content {
-      padding-inline: 2rem;
+      padding-inline: 2.5rem;
     }
   }
 
@@ -135,11 +142,11 @@
   }
 
   .btn-primary {
-    @apply inline-flex h-11 items-center justify-center rounded-md bg-accent px-5 text-sm font-medium text-bg transition-colors duration-200 hover:bg-accent-hover;
+    @apply inline-flex h-11 items-center justify-center rounded-md bg-accent px-5 text-sm font-medium text-black transition-colors duration-200 hover:bg-accent-hover;
   }
 
   .btn-ghost {
-    @apply inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-transparent px-5 text-sm font-medium text-text transition-colors duration-200 hover:border-white/30 hover:bg-white/[0.03];
+    @apply inline-flex h-11 items-center justify-center rounded-md border border-black/15 bg-transparent px-5 text-sm font-medium text-text transition-colors duration-200 hover:border-black/30 hover:bg-black/[0.03];
   }
 
   .panel {
@@ -147,7 +154,7 @@
   }
 
   .code-window {
-    @apply overflow-hidden rounded-xl border border-border bg-[#0a0a0a] shadow-[0_0_0_1px_rgba(255,255,255,0.03)];
+    @apply overflow-hidden rounded-xl border border-border bg-[#0a0a0a] text-white shadow-[0_0_0_1px_rgba(0,0,0,0.04)];
   }
 
   .grain {
@@ -155,7 +162,7 @@
     position: fixed;
     inset: 0;
     z-index: 50;
-    opacity: 0.028;
+    opacity: 0.02;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 180px 180px;
@@ -182,12 +189,65 @@
   }
 
   .tab-btn[aria-selected="true"] {
-    @apply bg-white/8 text-text;
+    @apply bg-black/5 text-text;
   }
 
   .tab-panel[hidden] {
     display: none;
   }
+
+  .logo-chip {
+    @apply inline-flex items-center gap-2.5 rounded-full border border-black/10 bg-black/[0.02] px-3.5 py-2 text-sm font-medium text-text-muted transition-colors hover:border-black/20 hover:text-text;
+  }
+
+  .logo-chip img,
+  .logo-chip svg {
+    @apply h-[18px] w-[18px] shrink-0;
+  }
+}
+
+/* ---------- Single black band (pattern break) ---------- */
+.section-dark {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.section-dark .eyebrow {
+  color: #6b6b6b;
+}
+
+.section-dark h2,
+.section-dark h3 {
+  color: #ffffff;
+}
+
+.section-dark p,
+.section-dark li {
+  color: #a3a3a3;
+}
+
+.section-dark .panel {
+  background-color: #111111;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.section-dark .btn-ghost {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.section-dark .btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.section-dark .btn-primary {
+  color: #000000;
+}
+
+.section-dark .code-window {
+  border-color: rgba(255, 255, 255, 0.1);
+  background-color: #0a0a0a;
 }
 
 @keyframes fade-up {

@@ -1,26 +1,87 @@
 ---
-const tools = [
-  "Claude Code",
-  "Cursor",
-  "MCP clients",
-  "Custom agents",
-  "CLI",
-  "stdio MCP",
+const tools: Array<{
+  name: string;
+  logo?: string;
+  href?: string;
+}> = [
+  {
+    name: "Claude Code",
+    logo: "/logos/claude.svg",
+    href: "https://docs.anthropic.com/en/docs/claude-code",
+  },
+  {
+    name: "Cursor",
+    logo: "/logos/cursor-dark.svg",
+    href: "https://cursor.com",
+  },
+  {
+    name: "Hermes",
+    logo: "/logos/mcp-dark.svg",
+  },
+  {
+    name: "Cline / Roo",
+    logo: "/logos/mcp-dark.svg",
+  },
+  {
+    name: "VS Code Copilot",
+    logo: "/logos/mcp-dark.svg",
+  },
+  {
+    name: "Zed",
+    logo: "/logos/mcp-dark.svg",
+  },
+  {
+    name: "Any MCP client",
+    logo: "/logos/mcp-dark.svg",
+    href: "https://modelcontextprotocol.io",
+  },
 ];
 ---
 
-<section class="border-y border-border bg-bg-elevated" aria-label="Integrations">
-  <div class="container-content py-10 md:py-12">
-    <p class="text-center text-sm text-text-faint">
-      Works with the agents and tools you already use
+<section class="border-y border-black/[0.06] bg-white" aria-label="Integrations">
+  <div class="container-content py-12 md:py-14">
+    <p class="text-center text-sm text-neutral-400">
+      MCP-first — one memory layer across your tools
     </p>
-    <ul
-      class="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 md:gap-x-12"
-    >
+    <p class="mt-2 text-center text-xs text-neutral-400">
+      Works with Claude Code, Cursor, Hermes, Cline, VS Code, Zed, Windsurf, and any MCP client
+    </p>
+    <ul class="mt-7 flex flex-wrap items-center justify-center gap-3 md:gap-4">
       {
-        tools.map((name) => (
-          <li class="text-sm font-medium tracking-tight text-text-muted">
-            {name}
+        tools.map((tool) => (
+          <li>
+            {tool.href ? (
+              <a
+                href={tool.href}
+                class="logo-chip"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {tool.logo && (
+                  <img
+                    src={tool.logo}
+                    alt=""
+                    width="18"
+                    height="18"
+                    class="h-[18px] w-[18px]"
+                  />
+                )}
+                <span>{tool.name}</span>
+              </a>
+            ) : (
+              <span class="logo-chip pointer-events-none">
+                {tool.logo && (
+                  <img
+                    src={tool.logo}
+                    alt=""
+                    width="18"
+                    height="18"
+                    class="h-[18px] w-[18px]"
+                  />
+                )}
+                <span>{tool.name}</span>
+              </span>
+            )}
           </li>
         ))
       }

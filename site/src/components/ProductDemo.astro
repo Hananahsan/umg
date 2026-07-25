@@ -1,4 +1,6 @@
 ---
+import MemoryOrb from "./MemoryOrb";
+
 const tiers = [
   {
     name: "working",
@@ -44,38 +46,39 @@ const memories = [
   },
   {
     tier: "episodic",
-    content: "Landing page copy review — omit Login until auth exists",
+    content: "Landing page copy review: omit Login until auth exists",
     score: "0.62",
   },
 ];
 ---
 
-<section class="section-pad border-t border-border bg-bg-elevated/40" id="product" aria-labelledby="product-heading">
+<section class="section-pad border-0 bg-transparent" id="product" aria-labelledby="product-heading">
   <div class="container-content">
     <div class="grid items-start gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
       <div>
         <p class="eyebrow mb-4">Product</p>
         <h2
           id="product-heading"
-          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text text-balance"
+          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-white text-balance"
         >
           Hierarchical memory, not a bigger bag.
         </h2>
-        <p class="mt-5 text-base leading-relaxed text-text-muted">
+        <p class="mt-5 text-base leading-relaxed text-neutral-400">
           Every memory has a tier, importance, decay score, and lifecycle.
-          Recall re-ranks with FTS, importance, recency, and tier priors — then
-          consolidation keeps the store sharp.
+          Recall re-ranks with configurable weights: FTS, importance, decay,
+          tier, recency, and entity match. Then consolidation keeps the store
+          sharp.
         </p>
 
         <ul class="mt-8 space-y-3">
           {
             [
               "Auto-tier on write, or set tier explicitly",
-              "Merge similar facts; supersede contradictions",
-              "Promote repeated patterns into procedural skills",
-              "Namespace isolation for projects and personal prefs",
+              "Additive-first writes; supersede only when confidence is clear",
+              "Multi-pass merge and promotion quality gates",
+              "Namespace isolation (optional hard isolation)",
             ].map((line) => (
-              <li class="flex items-start gap-3 text-sm text-text-muted">
+              <li class="flex items-start gap-3 text-sm text-neutral-400">
                 <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent" />
                 <span>{line}</span>
               </li>
@@ -84,43 +87,51 @@ const memories = [
         </ul>
       </div>
 
-      <!-- Dashboard mock -->
       <div class="code-window">
         <div
-          class="flex items-center justify-between border-b border-border px-4 py-3"
+          class="flex items-center justify-between border-b border-white/10 px-4 py-3"
         >
           <div class="flex items-center gap-3">
-            <span class="font-display text-sm font-semibold">Nura</span>
+            <span class="font-display text-sm font-semibold text-white">Nura</span>
             <span
-              class="rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] text-text-faint"
+              class="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[0.625rem] text-neutral-500"
               >namespace · global</span
             >
           </div>
-          <span class="flex items-center gap-1.5 text-xs text-text-faint">
-            <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
-            local sqlite
-          </span>
+          <!-- searching orb = live recall over the memory store -->
+          <div class="flex items-center gap-2">
+            <MemoryOrb
+              client:visible
+              size={20}
+              theme="dark"
+              speed={0.35}
+              label="Recalling from hierarchical memory"
+            />
+            <span class="font-mono text-[0.6875rem] text-neutral-500"
+              >recall</span
+            >
+          </div>
         </div>
 
-        <div class="grid border-b border-border sm:grid-cols-4">
+        <div class="grid border-b border-white/10 sm:grid-cols-4">
           {
             tiers.map((tier) => (
               <div
                 class:list={[
-                  "border-b border-border px-3 py-3 sm:border-b-0 sm:border-r sm:last:border-r-0",
+                  "border-b border-white/10 px-3 py-3 sm:border-b-0 sm:border-r sm:last:border-r-0 sm:border-white/10",
                   tier.active && "bg-accent-dim/40",
                 ]}
               >
                 <p
                   class:list={[
                     "font-mono text-[0.6875rem]",
-                    tier.active ? "text-accent" : "text-text-faint",
+                    tier.active ? "text-accent" : "text-neutral-500",
                   ]}
                 >
                   {tier.name}
                 </p>
-                <p class="mt-1 text-xs text-text-muted">{tier.purpose}</p>
-                <p class="mt-1 font-mono text-[0.625rem] text-text-faint">
+                <p class="mt-1 text-xs text-neutral-400">{tier.purpose}</p>
+                <p class="mt-1 font-mono text-[0.625rem] text-neutral-500">
                   {tier.meta}
                 </p>
               </div>
@@ -130,7 +141,7 @@ const memories = [
 
         <div class="p-2 sm:p-3">
           <div
-            class="mb-2 flex items-center justify-between px-2 py-1 text-[0.625rem] uppercase tracking-wider text-text-faint"
+            class="mb-2 flex items-center justify-between px-2 py-1 text-[0.625rem] uppercase tracking-wider text-neutral-500"
           >
             <span>Active memories</span>
             <span>score</span>
@@ -143,9 +154,9 @@ const memories = [
                     <span class="font-mono text-[0.625rem] text-accent/80">
                       {m.tier}
                     </span>
-                    <p class="mt-0.5 truncate text-sm text-text">{m.content}</p>
+                    <p class="mt-0.5 truncate text-sm text-white">{m.content}</p>
                   </div>
-                  <span class="shrink-0 font-mono text-xs text-text-faint">
+                  <span class="shrink-0 font-mono text-xs text-neutral-500">
                     {m.score}
                   </span>
                 </li>
@@ -155,13 +166,14 @@ const memories = [
         </div>
 
         <div
-          class="flex flex-wrap gap-2 border-t border-border px-4 py-3 font-mono text-[0.6875rem] text-text-faint"
+          class="flex flex-wrap gap-2 border-t border-white/10 px-4 py-3 font-mono text-[0.6875rem] text-neutral-500"
         >
           <span class="rounded bg-white/[0.04] px-2 py-1">retain</span>
           <span class="rounded bg-white/[0.04] px-2 py-1">recall</span>
           <span class="rounded bg-white/[0.04] px-2 py-1">reflect</span>
+          <span class="rounded bg-white/[0.04] px-2 py-1">list_memories</span>
           <span class="rounded bg-white/[0.04] px-2 py-1">prune</span>
-          <span class="rounded bg-white/[0.04] px-2 py-1">promote</span>
+          <span class="rounded bg-white/[0.04] px-2 py-1">promote_to_skill</span>
         </div>
       </div>
     </div>

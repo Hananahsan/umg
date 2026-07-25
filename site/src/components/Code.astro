@@ -1,114 +1,130 @@
 ---
-import { DOCS, GITHUB } from "../lib/links";
+import { DOCS, EXAMPLES, GITHUB } from "../lib/links";
 
 const tabs = [
   {
     id: "cli",
     label: "CLI",
-    code: `# Install & build
+    code: `# From the umg repo
 npm install && npm run build
 
 # Store a fact
-npx umg retain --content "Prefer TypeScript strict mode" --tier semantic
+node dist/index.js retain --content "Prefer TypeScript strict mode" --tier semantic
 
 # Recall it
-npx umg recall --query "TypeScript"
+node dist/index.js recall --query "TypeScript"
 
-# Stats & prune
-npx umg stats
-npx umg prune --dry-run`,
+# Stats (weights + 7d metrics + size)
+node dist/index.js stats
+
+# Dry-run prune, then compact DB
+node dist/index.js prune --dry-run
+node dist/index.js compact`,
   },
   {
     id: "mcp",
     label: "MCP config",
     code: `{
   "mcpServers": {
-    "nura": {
+    "umg": {
       "command": "node",
-      "args": ["/path/to/umg/dist/index.js", "mcp"],
+      "args": ["/absolute/path/to/umg/dist/index.js", "mcp"],
       "env": {
-        "UMG_DB_PATH": "~/.umg/memory.db"
+        "UMG_DB_PATH": "/absolute/path/to/home/.umg/memory.db"
       }
     }
   }
-}`,
+}
+
+// Same block shape for Claude Code, Cursor, Cline, VS Code, Zed, …
+// Only the config file location changes.
+// See: github.com/Hananahsan/umg/tree/main/examples`,
   },
   {
     id: "agent",
     label: "Agent pattern",
     code: `# Session start
 recall(query: "project name + current task")
+# or MCP prompt: session-start
 
 # When you learn something durable
 retain(content: "concise fact", tier: "semantic")
 
 # Session end
 reflect(text: "decisions and preferences from session")
+# or MCP prompt: session-end
 
 # Periodically
-prune(dry_run: true)  # then without dry_run`,
+prune(dry_run: true)  # then without dry_run
+promote_to_skill(...) # or dry_run first`,
   },
 ];
 ---
 
-<section class="section-pad border-t border-border" id="code" aria-labelledby="code-heading">
+<section class="section-pad border-0 bg-white" id="code" aria-labelledby="code-heading">
   <div class="container-content">
     <div class="grid items-start gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
       <div>
         <p class="eyebrow mb-4">Quickstart</p>
         <h2
           id="code-heading"
-          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-text text-balance"
+          class="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] text-black text-balance"
         >
           Memory in minutes. Not a platform migration.
         </h2>
-        <p class="mt-5 text-base leading-relaxed text-text-muted">
-          Connect via MCP or use the CLI. Same tools for retain, recall, reflect,
-          and prune — whether you are in Claude Code, Cursor, or a custom agent.
+        <p class="mt-5 text-base leading-relaxed text-neutral-500">
+          Connect via MCP or use the CLI. Same six tools for retain, recall, reflect,
+          list, prune, and promote — in any MCP-compatible client.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
           <a href={DOCS} class="btn-primary">Read the quickstart</a>
+          <a href={EXAMPLES} class="btn-ghost">Client configs</a>
           <a href={GITHUB} class="btn-ghost">GitHub</a>
         </div>
       </div>
 
-      <div class="code-window" data-tabs>
-        <div
-          class="flex items-center gap-1 border-b border-border px-3 py-2"
-          role="tablist"
-          aria-label="Code examples"
-        >
+      <div>
+        <div class="code-window" data-tabs>
+          <div
+            class="flex items-center gap-1 border-b border-white/10 px-3 py-2"
+            role="tablist"
+            aria-label="Code examples"
+          >
+            {
+              tabs.map((tab, i) => (
+                <button
+                  type="button"
+                  class="tab-btn !text-neutral-400 aria-selected:!bg-white/10 aria-selected:!text-white"
+                  role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-selected={i === 0 ? "true" : "false"}
+                  aria-controls={`panel-${tab.id}`}
+                  data-tab={tab.id}
+                >
+                  {tab.label}
+                </button>
+              ))
+            }
+          </div>
+
           {
             tabs.map((tab, i) => (
-              <button
-                type="button"
-                class="tab-btn"
-                role="tab"
-                id={`tab-${tab.id}`}
-                aria-selected={i === 0 ? "true" : "false"}
-                aria-controls={`panel-${tab.id}`}
-                data-tab={tab.id}
+              <div
+                class="tab-panel p-5"
+                role="tabpanel"
+                id={`panel-${tab.id}`}
+                aria-labelledby={`tab-${tab.id}`}
+                hidden={i !== 0}
+                data-panel={tab.id}
               >
-                {tab.label}
-              </button>
+                <pre class="overflow-x-auto font-mono text-[0.8125rem] leading-relaxed text-neutral-300"><code>{tab.code}</code></pre>
+              </div>
             ))
           }
         </div>
-
-        {
-          tabs.map((tab, i) => (
-            <div
-              class="tab-panel p-5"
-              role="tabpanel"
-              id={`panel-${tab.id}`}
-              aria-labelledby={`tab-${tab.id}`}
-              hidden={i !== 0}
-              data-panel={tab.id}
-            >
-              <pre class="overflow-x-auto font-mono text-[0.8125rem] leading-relaxed text-text-muted"><code>{tab.code}</code></pre>
-            </div>
-          ))
-        }
+        <p class="mt-4 text-sm leading-relaxed text-neutral-500">
+          Same MCP server works across clients. Only the config file location changes.
+        </p>
       </div>
     </div>
   </div>
@@ -121,7 +137,9 @@ prune(dry_run: true)  # then without dry_run`,
     tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
         const id = tab.getAttribute("data-tab");
-        tabs.forEach((t) => t.setAttribute("aria-selected", t === tab ? "true" : "false"));
+        tabs.forEach((t) =>
+          t.setAttribute("aria-selected", t === tab ? "true" : "false"),
+        );
         panels.forEach((p) => {
           p.hidden = p.getAttribute("data-panel") !== id;
         });
