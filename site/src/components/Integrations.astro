@@ -1,7 +1,7 @@
 ---
 const tools: Array<{
   name: string;
-  logo?: string;
+  logo: string;
   href?: string;
 }> = [
   {
@@ -16,19 +16,21 @@ const tools: Array<{
   },
   {
     name: "Hermes",
-    logo: "/logos/mcp-dark.svg",
+    logo: "/logos/hermes.svg",
   },
   {
     name: "Cline / Roo",
-    logo: "/logos/mcp-dark.svg",
+    logo: "/logos/cline.svg",
   },
   {
     name: "VS Code Copilot",
-    logo: "/logos/mcp-dark.svg",
+    logo: "/logos/github-copilot.svg",
+    href: "https://code.visualstudio.com",
   },
   {
     name: "Zed",
-    logo: "/logos/mcp-dark.svg",
+    logo: "/logos/zed.svg",
+    href: "https://zed.dev",
   },
   {
     name: "Any MCP client",
@@ -57,28 +59,24 @@ const tools: Array<{
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {tool.logo && (
-                  <img
-                    src={tool.logo}
-                    alt=""
-                    width="18"
-                    height="18"
-                    class="h-[18px] w-[18px]"
-                  />
-                )}
+                <img
+                  src={tool.logo}
+                  alt=""
+                  width="18"
+                  height="18"
+                  class="h-[18px] w-[18px] object-contain"
+                />
                 <span>{tool.name}</span>
               </a>
             ) : (
               <span class="logo-chip pointer-events-none">
-                {tool.logo && (
-                  <img
-                    src={tool.logo}
-                    alt=""
-                    width="18"
-                    height="18"
-                    class="h-[18px] w-[18px]"
-                  />
-                )}
+                <img
+                  src={tool.logo}
+                  alt=""
+                  width="18"
+                  height="18"
+                  class="h-[18px] w-[18px] object-contain"
+                />
                 <span>{tool.name}</span>
               </span>
             )}
