@@ -44,9 +44,9 @@ See [examples/README.md](./examples/README.md) for configs, session playbooks, a
 
 - Node.js **20+**
 
-### 2. Install (recommended)
+### 2. Install from npm (recommended)
 
-Once published to npm, no clone or absolute path:
+Package: **`@umg0/umg0`** on the public registry (binary `umg0`).
 
 ```bash
 # smoke test
@@ -88,7 +88,7 @@ npm install -g @umg0/umg0
 }
 ```
 
-**From this repo** (before publish, offline, or development):
+### 3. From this repo (dev / offline / contribution)
 
 ```bash
 git clone https://github.com/Hananahsan/umg.git
@@ -100,23 +100,7 @@ npm install -g .          # exposes umg0 on PATH
 node dist/index.js mcp
 ```
 
-Client samples: [examples/claude-code.mcp.json](./examples/claude-code.mcp.json) · [examples/cursor.mcp.json](./examples/cursor.mcp.json) · [examples/hermes.config.snippet.yaml](./examples/hermes.config.snippet.yaml) · [examples/vscode-cline.mcp.json](./examples/vscode-cline.mcp.json)
-
-Restart the client after saving config.
-
-**Single-writer:** one MCP process per DB file. Point every client at the **same** server command/DB — do not run multiple writers against one SQLite file.
-
-### 3. Optional: database path
-
-Default if unset: `~/.umg/memory.db` (resolved by config). Only set `UMG_DB_PATH` if you need a custom location — use an **absolute** path (many MCP hosts do not expand `~`).
-
-```bash
-export UMG_DB_PATH="$HOME/.umg/memory.db"
-```
-
-### 4. From-source fallback
-
-Still supported for local builds:
+**From-source MCP** (absolute path — many hosts do not expand `~`):
 
 ```json
 {
@@ -133,6 +117,20 @@ Dev without building:
 
 ```bash
 npx tsx src/index.ts retain --content "..." --tier semantic
+```
+
+Client samples: [examples/claude-code.mcp.json](./examples/claude-code.mcp.json) · [examples/cursor.mcp.json](./examples/cursor.mcp.json) · [examples/hermes.config.snippet.yaml](./examples/hermes.config.snippet.yaml) · [examples/vscode-cline.mcp.json](./examples/vscode-cline.mcp.json)
+
+Restart the client after saving config.
+
+**Single-writer:** one MCP process per DB file. Point every client at the **same** server command/DB — do not run multiple writers against one SQLite file.
+
+### 4. Optional: database path
+
+Default if unset: `~/.umg/memory.db` (resolved by config). Only set `UMG_DB_PATH` if you need a custom location — use an **absolute** path (many MCP hosts do not expand `~`).
+
+```bash
+export UMG_DB_PATH="$HOME/.umg/memory.db"
 ```
 
 ## Agent usage pattern

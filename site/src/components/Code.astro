@@ -6,14 +6,18 @@ const tabs = [
   {
     id: "cli",
     label: "CLI",
-    code: `# Preferred (npm package @umg0/umg0)
+    code: `# npm package @umg0/umg0 (binary umg0)
 npx -y @umg0/umg0 retain --content "Prefer TypeScript strict mode" --tier semantic
 npx -y @umg0/umg0 recall --query "TypeScript"
 npx -y @umg0/umg0 stats
 npx -y @umg0/umg0 prune --dry-run
 
 # After: npm i -g @umg0/umg0
-# umg0 retain --content "..." --tier semantic`,
+# umg0 retain --content "..." --tier semantic
+
+# From a clone (dev / offline):
+# npm i && npm run build && npm i -g .
+# umg0 retain ...  |  node dist/index.js mcp`,
   },
   {
     id: "mcp",
@@ -31,7 +35,8 @@ npx -y @umg0/umg0 prune --dry-run
 }
 
 // Same block for Claude Code, Cursor, Cline, VS Code, Zed, …
-// Global install alternative: command "umg0", args ["mcp"]
+// Global install: command "umg0", args ["mcp"]
+// From source: command "node", args ["./dist/index.js", "mcp"]
 // See: github.com/Hananahsan/umg/tree/main/examples`,
   },
   {
@@ -69,7 +74,7 @@ promote_to_skill(...) # dry_run first when unsure`,
           list, prune, and promote in any MCP-compatible client.
         </p>
         <div class="mt-7">
-          <InstallCommand command="npm i @umg0/umg0" />
+          <InstallCommand command="npx -y @umg0/umg0" />
         </div>
         <div class="mt-8 flex flex-wrap gap-3">
           <a href={DOCS} class="btn-primary">Read the quickstart</a>

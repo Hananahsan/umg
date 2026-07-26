@@ -81,7 +81,7 @@ Optional hybrid when embedding present:
 ## Read path (`recall`)
 
 1. FTS (or LIKE) candidate set  
-2. Multi-factor re-rank (v0.1.2 — entity boost, Mem0-inspired, no embeddings):
+2. Multi-factor re-rank (v0.2 — entity boost, Mem0-inspired, no embeddings required):
 
 ```
 score = 0.32·fts + 0.18·importance + 0.18·decay

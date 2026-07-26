@@ -141,13 +141,16 @@ const features = [
                   <pre class="code-scroll mt-3 max-w-full overflow-x-auto text-neutral-300">{`{
   "mcpServers": {
     "umg": {
-      "command": "node",
-      "args": ["./dist/index.js", "mcp"]
+      "command": "npx",
+      "args": ["-y", "@umg0/umg0", "mcp"]
     }
   }
 }`}</pre>
                   <p class="mt-4 break-words text-neutral-500">
-                    # umg stats · umg compact · umg prune --dry-run
+                    // From source: "node", ["./dist/index.js", "mcp"]
+                  </p>
+                  <p class="mt-2 break-words text-neutral-500">
+                    # umg0 stats · umg0 compact · umg0 prune --dry-run
                   </p>
                 </div>
               )}

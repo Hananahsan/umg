@@ -1,7 +1,7 @@
 ---
 /**
- * Embeddable package install line with copy + shiny border.
- * Command matches package.json name: @umg0/umg0
+ * Embeddable package install/run line with copy + shiny border.
+ * Package: @umg0/umg0 (binary umg0) — published on npm.
  */
 interface Props {
   command?: string;
@@ -10,8 +10,8 @@ interface Props {
 }
 
 const {
-  command = "npm i @umg0/umg0",
-  label = "Install",
+  command = "npx -y @umg0/umg0",
+  label = "Get started",
   class: className = "",
 } = Astro.props;
 ---
