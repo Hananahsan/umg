@@ -2,8 +2,11 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { bootstrapApp } from "./app.js";
+import { bootstrapApp, createApp, type UmgApp } from "./app.js";
 import { startMcpServer } from "./mcp/server.js";
+import { startInspector } from "./inspector/server.js";
+import { createDemoApp } from "./inspector/demo-dataset.js";
+import { openBrowser } from "./inspector/open-browser.js";
 import { log } from "./util/log.js";
 import { VERSION } from "./util/version.js";
 
@@ -18,6 +21,8 @@ Start MCP (preferred):
 
 Usage:
   umg0 mcp              Start MCP server on stdio (default)
+  umg0 inspect [--port <n>] [--db <path>] [--no-open] [--demo] [--api-only]
+                        Read-only local web UI for memory hygiene (127.0.0.1)
   umg0 prune [--dry-run] [--aggressive] [--namespace <ns>]
   umg0 stats
   umg0 compact [--export-archives]
@@ -58,6 +63,64 @@ function hasFlag(args: string[], name: string): boolean {
   return args.includes(name);
 }
 
+/**
+ * `umg0 inspect` — read-only hygiene inspector on 127.0.0.1.
+ *
+ * Uses createApp (not bootstrapApp) so no startup prune runs, and opens the
+ * store read-only so nothing can be mutated even if a service tries.
+ */
+async function runInspect(args: string[], dbPath?: string): Promise<void> {
+  const demo = hasFlag(args, "--demo");
+  const apiOnly = hasFlag(args, "--api-only");
+  const portRaw = getFlag(args, "--port");
+  const port = portRaw ? Number(portRaw) : undefined;
+  if (portRaw && (!Number.isInteger(port) || port! < 0 || port! > 65535)) {
+    process.stderr.write(`Invalid --port: ${portRaw}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  let app: UmgApp | undefined;
+  if (!demo) {
+    try {
+      app = createApp({ dbPath, readonly: true });
+    } catch (err) {
+      process.stderr.write(
+        `Could not open the database read-only: ${String(err)}\n` +
+          `Try 'umg0 inspect --demo' to explore with a synthetic dataset.\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  const inspector = await startInspector({
+    app,
+    demoFactory: () => createDemoApp(),
+    demoFirst: demo,
+    port,
+    apiOnly,
+  });
+
+  const label = demo ? " (demo dataset)" : "";
+  process.stderr.write(
+    `umg0 inspect — read-only${label}\n  ${inspector.url}\n` +
+      (apiOnly ? "  JSON API only (--api-only)\n" : ""),
+  );
+
+  if (!hasFlag(args, "--no-open") && !apiOnly) {
+    openBrowser(inspector.url);
+  }
+
+  const shutdown = async (): Promise<void> => {
+    await inspector.close();
+    app?.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => void shutdown());
+  process.on("SIGTERM", () => void shutdown());
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
 
@@ -81,6 +144,14 @@ async function main(): Promise<void> {
   const args = cmd === argv[0] ? argv.slice(1) : argv;
 
   const dbPath = getFlag(args, "--db") ?? process.env.UMG_DB_PATH;
+
+  // Handled before bootstrapApp: the inspector is read-only, and startup
+  // maintenance runs a light prune that writes.
+  if (cmd === "inspect") {
+    await runInspect(args, dbPath);
+    return;
+  }
+
   const skipStartupPrune =
     process.env.UMG_SKIP_STARTUP_PRUNE === "1" ||
     process.env.UMG_SKIP_STARTUP_PRUNE === "true" ||

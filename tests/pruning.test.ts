@@ -200,4 +200,68 @@ describe("pruning and decay", () => {
     expect(cap).toBeTruthy();
     expect(cap?.reason).toBe("cap_tier");
   });
+
+  /**
+   * A dry run is a prediction of the real run. These two guarded different
+   * bugs that made it lie, both of which the inspector renders directly.
+   */
+  describe("dry run predicts the real run", () => {
+    it("reports each merge and supersede once, not once per pass", async () => {
+      const ns = "dry-passes";
+      for (const content of [
+        "The staging API base URL is https://staging.example.com/v1 for all clients.",
+        "The staging API base URL is https://staging.example.com/v1 for clients.",
+        "The staging API base URL is https://staging.example.com/v1 for all clients today.",
+      ]) {
+        await app.memory.retain({
+          content,
+          tier: "semantic",
+          importance: 0.8,
+          namespace: ns,
+          skip_merge: true,
+        });
+      }
+
+      const dry = await app.consolidation.prune({ namespace: ns, dry_run: true });
+      const pairs = dry.details
+        .filter((d) => d.action === "merge" || d.action === "supersede")
+        .map((d) => `${d.action}:${d.into}->${d.from}`);
+
+      // findSimilar reads the database, which on a dry run still shows the
+      // loser as active — each pass used to re-detect the same pair.
+      expect(new Set(pairs).size).toBe(pairs.length);
+
+      const real = await app.consolidation.prune({ namespace: ns });
+      expect(dry.merged).toBe(real.merged);
+      expect(dry.archived).toBe(real.archived);
+    });
+
+    it("applies recomputed decay before the score-floor check", async () => {
+      const ns = "dry-decay";
+      app.cfg.consolidation.eviction_floor = 0.2;
+      app.cfg.consolidation.grace_period_days = 0;
+
+      const r = await app.memory.retain({
+        content: "An old episodic note about a vendor call that nobody revisited.",
+        tier: "episodic",
+        importance: 0.4,
+        namespace: ns,
+        skip_merge: true,
+      });
+      // Stale access time with a still-high stored decay_score: the prune must
+      // recompute and act on the new value, not the stored one.
+      await app.store.update(r.id!, {
+        decay_score: 0.9,
+        last_accessed_at: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      const dry = await app.consolidation.prune({ namespace: ns, dry_run: true });
+      expect(dry.details.some((d) => d.action === "evict_floor" && d.id === r.id)).toBe(
+        true,
+      );
+
+      await app.consolidation.prune({ namespace: ns });
+      expect((await app.store.get(r.id!))?.status).toBe("archived");
+    });
+  });
 });

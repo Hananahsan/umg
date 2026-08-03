@@ -1,0 +1,149 @@
+/*
+ * source(none) disables Tailwind v4's automatic content detection, which
+ * otherwise scans the whole repository — a README edit would change the
+ * generated CSS, and scripts/check-inspector-assets.mjs would fail CI on a
+ * documentation-only commit. Sources are listed explicitly instead.
+ */
+@import "tailwindcss" source(none);
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
+
+/*
+ * umg0 inspect — dark instrument panel.
+ *
+ * This is recorded as video and screenshotted, so the palette is tuned for
+ * near-black backgrounds where the four tier hues stay separable at small
+ * sizes. Tier and operation colors are fixed here and reused verbatim by the
+ * prune replay, so the same memory is the same color in every view.
+ *
+ * No web fonts: the inspector ships inside the npm tarball that MCP-only
+ * users download, and the platform monospace stack suits instrumentation.
+ */
+
+@theme {
+  --color-ink: #08090c;
+  --color-ink-raised: #0d0f14;
+  --color-ink-panel: #12151c;
+  --color-ink-inset: #05060a;
+
+  --color-line: rgba(255, 255, 255, 0.07);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+
+  --color-text: #e8eaee;
+  --color-muted: #8b91a0;
+  --color-faint: #5a6070;
+
+  --color-accent: #c4b5fd;
+
+  /* Memory tiers — volatile (warm) through permanent (green). */
+  --color-working: #ff9f45;
+  --color-episodic: #4cc9f0;
+  --color-semantic: #c4b5fd;
+  --color-procedural: #7ee787;
+
+  /* Consolidation operations — reused by the dry-run diff and replay. */
+  --color-op-merge: #4cc9f0;
+  --color-op-supersede: #c4b5fd;
+  --color-op-decay: #ff9f45;
+  --color-op-evict: #ff6b6b;
+  --color-op-keep: #8b91a0;
+
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1, "zero" 1;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /*
+   * Reduced motion is not a degraded view: every animated element must still
+   * render its final state. The replay relies on this too — it steps through
+   * states instantly rather than showing nothing.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Faint dot grid + a cold glow behind the header, for depth on video. */
+  .panel-field {
+    background-image:
+      radial-gradient(
+        ellipse 70% 50% at 50% -10%,
+        rgba(196, 181, 253, 0.09),
+        transparent 70%
+      ),
+      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.045) 1px, transparent 0);
+    background-size:
+      100% 100%,
+      28px 28px;
+  }
+
+  /* Film grain keeps large flat blacks from banding in a screen recording. */
+  .grain::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .rule {
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    color: var(--color-faint);
+  }
+
+  /*
+   * Capacity-rail entrance.
+   *
+   * Only a `from` frame is declared and there is no fill-mode and no delay,
+   * so at every moment the element either has a running animation or its own
+   * resting transform (identity, i.e. the full bar). That is the whole point:
+   * a bar must never be able to get stuck collapsed. An `animation-delay`
+   * with `backwards` fill would reintroduce exactly that — the delay phase
+   * pins the element at scaleX(0), and a suspended animation (backgrounded
+   * tab) never leaves it.
+   *
+   * Rails are therefore staggered by varying duration, not delay: they all
+   * start together and settle in sequence.
+   */
+  @keyframes bar-grow {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  .bar-grow {
+    animation: bar-grow var(--bar-duration, 700ms) cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
