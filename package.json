@@ -21,7 +21,9 @@
     "ARCHITECTURE.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-inspector-assets.mjs",
+    "build:ui": "npm --prefix inspector-ui install && npm --prefix inspector-ui run build",
+    "check:ui": "node scripts/check-inspector-assets.mjs",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "mcp": "tsx src/index.ts mcp",

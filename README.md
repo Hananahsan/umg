@@ -149,6 +149,41 @@ Periodically: `prune` (`dry_run: true` first).
 | [examples/workflows/daily-coding.md](./examples/workflows/daily-coding.md) | Full-day tool sequences |
 | [examples/claude-code-hooks.md](./examples/claude-code-hooks.md) | Optional Claude Code Stop hook |
 
+## Inspector
+
+```bash
+npx -y @umg0/umg0 inspect
+```
+
+A local web UI that shows what consolidation is doing to your memory — the four
+levers (importance, merge/supersede, decay, eviction) made visible instead of
+buried in `prune --dry-run` JSON. Starts a server on `127.0.0.1`, prints the
+URL, and opens your browser.
+
+**It is read-only.** The database is opened in SQLite read-only mode and wrapped
+in a store that refuses every mutation, so it is safe to run against a database
+a live MCP server is using. There is no edit or delete UI.
+
+<!-- TODO: GIF of the prune replay goes here (step 3). -->
+
+| Flag | Meaning |
+|------|---------|
+| `--port <n>` | Port to bind (default: a free one) |
+| `--db <path>` | Database to inspect (default: normal resolution) |
+| `--no-open` | Don't open a browser |
+| `--demo` | Serve a synthetic in-memory dataset instead of your database |
+| `--api-only` | Serve JSON only, no static assets (for UI development) |
+
+`--demo` builds a throwaway dataset in memory — never written to disk — with
+planted near-duplicates, contradictions, and stale entries, so every
+consolidation operation has something to show. If your real database is nearly
+empty the UI says so and offers the same dataset in one click.
+
+The UI lives in [inspector-ui/](./inspector-ui/) and its build output is
+committed, so a fresh clone and the published package both work without
+installing the UI toolchain. After changing `inspector-ui/src`, run
+`npm run build:ui` and commit the result (`npm run check:ui` verifies it).
+
 ## Memory hierarchy
 
 | Tier | Purpose | Default pressure |
@@ -175,6 +210,7 @@ Copy [config.example.yaml](./config.example.yaml) to `~/.umg/config.yaml` or `./
 
 ```bash
 umg0 mcp
+umg0 inspect [--port <n>] [--db <path>] [--no-open] [--demo] [--api-only]
 umg0 retain --content "..." [--tier semantic] [--namespace global]
 umg0 recall --query "..." [--limit 8]
 umg0 reflect --text "..."
@@ -207,7 +243,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Out of scope (current)
 
-Multi-backend routing (Mem0/Zep), multi-tenant cloud, UI dashboard, graph DB, remote/HTTP MCP transport, attestation/federation.
+Multi-backend routing (Mem0/Zep), multi-tenant cloud, hosted dashboard, graph DB, remote/HTTP MCP transport, attestation/federation. (`umg0 inspect` is a local read-only viewer, not a managed UI.)
 
 ## License
 

@@ -1,0 +1,27 @@
+{
+  "name": "umg0-inspector-ui",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Static frontend for `umg0 inspect`. Built output is committed to inspector-ui/dist and copied into dist/inspector/public by the root build.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "comment": "Versions are pinned exactly: scripts/check-inspector-assets.mjs compares a fresh build against the committed output, and a floating range would make that check fail on unrelated dependency drift. `motion` is installed but not yet imported — the prune replay needs its FLIP layout animations, and until then it is deliberately kept out of the bundle (~100 kB) that ships in the npm tarball.",
+  "dependencies": {
+    "motion": "12.43.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.0.5",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vite": "8.2.0"
+  }
+}

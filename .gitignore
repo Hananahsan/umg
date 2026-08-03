@@ -1,5 +1,9 @@
 node_modules/
-dist/
+# Root build output only. site/ has its own .gitignore, and inspector-ui/dist
+# is committed on purpose so the published package and a fresh clone both work
+# without installing the UI toolchain (see scripts/check-inspector-assets.mjs).
+/dist/
+*.tsbuildinfo
 *.db
 *.db-shm
 *.db-wal

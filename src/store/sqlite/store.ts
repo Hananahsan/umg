@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
-import { statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import type { MemoryStore } from "../interface.js";
 import type {
   CountFilter,
@@ -92,31 +94,111 @@ function rowToMemory(row: MemoryRow): Memory {
   };
 }
 
+/**
+ * Open a database read-only.
+ *
+ * SQLite needs the `-shm` file to attach to a WAL database. When no writer
+ * currently holds the file that shm may not exist, and a read-only connection
+ * cannot create it — the open fails with SQLITE_CANTOPEN. In that case we copy
+ * the db (plus -wal/-shm if present) to a temp dir and read the copy, which
+ * also guarantees we cannot interfere with a live MCP process.
+ */
+function openReadonly(dbPath: string): {
+  db: Database.Database;
+  snapshotDir: string | null;
+} {
+  if (dbPath === ":memory:") {
+    throw new Error("Cannot open :memory: read-only");
+  }
+  if (!existsSync(dbPath)) {
+    throw new Error(`Database not found: ${dbPath}`);
+  }
+  try {
+    return {
+      db: new Database(dbPath, { readonly: true, fileMustExist: true }),
+      snapshotDir: null,
+    };
+  } catch (err) {
+    const snapshotDir = mkdtempSync(join(tmpdir(), "umg-inspect-"));
+    const name = basename(dbPath);
+    const copy = join(snapshotDir, name);
+    for (const suffix of ["", "-wal", "-shm"]) {
+      const src = dbPath + suffix;
+      if (existsSync(src)) copyFileSync(src, copy + suffix);
+    }
+    log.warn("read-only open failed; reading a temp snapshot instead", {
+      db: dbPath,
+      snapshot: copy,
+      error: String(err),
+    });
+    return {
+      db: new Database(copy, { readonly: true, fileMustExist: true }),
+      snapshotDir,
+    };
+  }
+}
+
+export interface SqliteStoreOptions {
+  /**
+   * Open the database read-only: no DDL, no journal pragmas, no writes.
+   * Used by `umg0 inspect`. Falls back to a temp snapshot when SQLite cannot
+   * attach read-only to a WAL database (see openReadonly).
+   */
+  readonly?: boolean;
+}
+
 export class SqliteMemoryStore implements MemoryStore {
   private db: Database.Database;
   private ftsAvailable = true;
   private dbPath: string;
   private cfg?: UmgConfig;
+  /** Temp snapshot directory to clean up on close (readonly fallback only). */
+  private snapshotDir: string | null = null;
 
-  constructor(dbPath: string, cfg?: UmgConfig) {
+  constructor(dbPath: string, cfg?: UmgConfig, opts?: SqliteStoreOptions) {
     this.dbPath = dbPath;
     this.cfg = cfg;
-    if (dbPath !== ":memory:") {
-      ensureDbDir(dbPath);
-    }
-    this.db = new Database(dbPath);
-    // Single-writer local discipline: WAL + busy_timeout for multi-client safety
-    this.db.pragma("journal_mode = WAL");
-    this.db.pragma("foreign_keys = ON");
-    this.db.pragma("synchronous = NORMAL");
     const busy = cfg?.sqlite.busy_timeout_ms ?? 5000;
-    this.db.pragma(`busy_timeout = ${busy}`);
-    migrate(this.db);
+
+    if (opts?.readonly) {
+      const opened = openReadonly(dbPath);
+      this.db = opened.db;
+      this.snapshotDir = opened.snapshotDir;
+      // Connection-level only. journal_mode/synchronous would write.
+      this.db.pragma("foreign_keys = ON");
+      this.db.pragma(`busy_timeout = ${busy}`);
+      this.assertReadableSchema();
+    } else {
+      if (dbPath !== ":memory:") {
+        ensureDbDir(dbPath);
+      }
+      this.db = new Database(dbPath);
+      // Single-writer local discipline: WAL + busy_timeout for multi-client safety
+      this.db.pragma("journal_mode = WAL");
+      this.db.pragma("foreign_keys = ON");
+      this.db.pragma("synchronous = NORMAL");
+      this.db.pragma(`busy_timeout = ${busy}`);
+      migrate(this.db);
+    }
+
     try {
       this.db.prepare("SELECT 1 FROM memories_fts LIMIT 1").get();
     } catch {
       this.ftsAvailable = false;
       log.warn("FTS5 not available; using LIKE fallback");
+    }
+  }
+
+  /** Readonly mode cannot run migrations — fail clearly instead of mid-query. */
+  private assertReadableSchema(): void {
+    try {
+      this.db.prepare("SELECT 1 FROM memories LIMIT 1").get();
+    } catch {
+      throw new Error(
+        `Database at ${this.dbPath} has no 'memories' table. ` +
+          `Read-only mode cannot run migrations — open it once with a normal ` +
+          `umg0 command (e.g. 'umg0 stats') first.`,
+      );
     }
   }
 
@@ -614,6 +696,10 @@ export class SqliteMemoryStore implements MemoryStore {
 
   close(): void {
     this.db.close();
+    if (this.snapshotDir) {
+      rmSync(this.snapshotDir, { recursive: true, force: true });
+      this.snapshotDir = null;
+    }
   }
 }
 

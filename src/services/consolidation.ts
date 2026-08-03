@@ -76,10 +76,18 @@ export class ConsolidationService {
         });
         if (!dry) {
           await this.store.update(m.id, { decay_score: ds, updated_at: now });
-          m.decay_score = ds;
         }
+        // Applied on dry runs too: the score-floor and cap steps below must
+        // see the recomputed value, or a dry run predicts a different
+        // outcome than the real one it is previewing.
+        m.decay_score = ds;
       }
     }
+
+    // Archived during this run. findSimilar reads the database, which on a
+    // dry run still reports these as active — without this set the same
+    // merge/supersede is re-detected on every pass and the counts inflate.
+    const consumed = new Set<string>();
 
     // 2) Hard expiry
     for (const m of memories) {
@@ -93,30 +101,41 @@ export class ConsolidationService {
         });
         if (!dry) await this.store.archive(m.id);
         m.status = "archived";
+        consumed.add(m.id);
       }
     }
 
     if (!light) {
       // 3) Bounded multi-pass merge / clear-supersede
+      const byId = new Map(memories.map((m) => [m.id, m]));
+
       for (let pass = 1; pass <= maxPasses; pass++) {
         const active = memories.filter((m) => m.status === "active");
         let changesThisPass = 0;
         const mergeSeen = new Set<string>();
 
         for (const m of active) {
-          if (mergeSeen.has(m.id) || m.status !== "active") continue;
+          if (mergeSeen.has(m.id) || consumed.has(m.id) || m.status !== "active") {
+            continue;
+          }
           const similar = await this.store.findSimilar(m.content, {
             namespace: m.namespace,
             limit: 5,
             exclude_id: m.id,
           });
-          for (const s of similar) {
-            if (mergeSeen.has(s.id) || s.status !== "active") continue;
+          for (const candidate of similar) {
+            // Prefer the tracked instance so status/content changes made
+            // earlier in this run are visible to later passes.
+            const s: Memory = byId.get(candidate.id) ?? candidate;
+            const similarity = candidate.score;
+            if (mergeSeen.has(s.id) || consumed.has(s.id) || s.status !== "active") {
+              continue;
+            }
 
             const decision = resolveWriteConflict(
               m.content,
               s.content,
-              s.score,
+              similarity,
               mergeThreshold,
               this.cfg.consolidation.supersede_min_confidence,
             );
@@ -131,10 +150,11 @@ export class ConsolidationService {
                 conflict: decision.reason,
                 into: winner.id,
                 from: loser.id,
-                score: s.score,
+                score: similarity,
                 pass,
               });
               mergeSeen.add(loser.id);
+              consumed.add(loser.id);
               archived++;
               changesThisPass++;
               if (!dry) {
@@ -156,7 +176,7 @@ export class ConsolidationService {
               break;
             }
 
-            if (s.score < mergeThreshold) continue;
+            if (similarity < mergeThreshold) continue;
             const target = pickMergeTarget(m, s);
             const source = target.id === m.id ? s : m;
             if (target.id === source.id) continue;
@@ -166,12 +186,13 @@ export class ConsolidationService {
               reason: "near_duplicate",
               into: target.id,
               from: source.id,
-              score: s.score,
+              score: similarity,
               pass,
             });
             merged++;
             changesThisPass++;
             mergeSeen.add(source.id);
+            consumed.add(source.id);
 
             if (!dry) {
               await this.applyMerge(target, source);
@@ -202,6 +223,8 @@ export class ConsolidationService {
             order_by: "updated_at",
             order_dir: "desc",
           });
+          byId.clear();
+          for (const m of memories) byId.set(m.id, m);
         } else {
           memories = memories.filter((m) => m.status === "active");
         }
