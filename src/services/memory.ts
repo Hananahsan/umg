@@ -365,17 +365,14 @@ export class MemoryService {
     const now = nowIso();
 
     // Never move a row down: tier takes the longer-lived of the two, expiry
-    // only ever moves later, and an upgrade leaves a metadata trace.
-    const upgrade = resolveTierUpgrade(target, incoming.tier, now);
-    const tier = upgrade.tier;
-
-    const metadata = {
-      // upgrade.metadata is target.metadata plus the tier_upgraded_* trace, so
-      // it has to be the base here — spreading target.metadata would drop it.
-      ...upgrade.metadata,
+    // only ever moves later, and an upgrade leaves a metadata trace. Our own
+    // metadata additions go in as an argument so there is no spread order to
+    // get wrong — upgrade.metadata is the complete object to write.
+    const upgrade = resolveTierUpgrade(target, incoming.tier, now, {
       ...(incoming.metadata ?? {}),
       merge_count: Number(target.metadata?.merge_count ?? 0) + 1,
-    };
+    });
+    const tier = upgrade.tier;
 
     return this.store.update(target.id, {
       content,
@@ -387,7 +384,7 @@ export class MemoryService {
       importance,
       confidence,
       parent_ids,
-      metadata,
+      metadata: upgrade.metadata,
       session_id: incoming.session_id ?? target.session_id,
       source: incoming.source ?? target.source,
       updated_at: now,

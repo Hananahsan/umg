@@ -414,7 +414,13 @@ export class ConsolidationService {
     // Never move a row down. Without this a prune could fold a procedural
     // memory into a working one and hand the survivor a 24h TTL — the same
     // downgrade the write path had.
-    const upgrade = resolveTierUpgrade(target, source.tier, now);
+    const upgrade = resolveTierUpgrade(target, source.tier, now, {
+      ...source.metadata,
+      merge_count:
+        Number(target.metadata?.merge_count ?? 0) +
+        Number(source.metadata?.merge_count ?? 0) +
+        1,
+    });
     const tier = upgrade.tier;
 
     return this.store.update(target.id, {
@@ -433,14 +439,7 @@ export class ConsolidationService {
       access_count: target.access_count + source.access_count,
       last_accessed_at: now,
       updated_at: now,
-      metadata: {
-        ...upgrade.metadata,
-        ...source.metadata,
-        merge_count:
-          Number(target.metadata?.merge_count ?? 0) +
-          Number(source.metadata?.merge_count ?? 0) +
-          1,
-      },
+      metadata: upgrade.metadata,
       decay_score: computeDecayScore(
         {
           tier,

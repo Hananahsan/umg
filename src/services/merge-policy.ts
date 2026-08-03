@@ -1,5 +1,7 @@
 import { extractValueSlots, type WriteConflictResolution } from "./contradiction.js";
 import { defaultExpiresAt } from "./scoring.js";
+import { effectiveLifetime, lifetimeRegression } from "./lifetime.js";
+import type { UmgConfig } from "../config.js";
 import { longerLivedTier, type Memory, type MemoryTier } from "../types.js";
 import { normalizeEntityText, normalizeEntityToken } from "../util/entity-normalize.js";
 import { tokenize } from "../util/text.js";
@@ -30,22 +32,32 @@ import { tokenize } from "../util/text.js";
  *    would have that extension revoked by an *upgrade*. Measured, an episodic
  *    row extended to 2029 came back from a semantic upgrade expiring in 2027.
  */
+export interface TierUpgrade {
+  tier: MemoryTier;
+  expires_at: string | null;
+  /**
+   * The complete metadata to write. Callers pass their own additions in and
+   * use this wholesale — there is no fragment to merge and therefore no spread
+   * order to get wrong. An earlier version returned only the trace and left
+   * the caller to combine it; mergeInto built its metadata object before
+   * calling, spread `target.metadata` over the result, and silently dropped
+   * the trace. No error, no test failure, just a missing field.
+   */
+  metadata: Record<string, unknown>;
+}
+
 export function resolveTierUpgrade(
   target: Pick<Memory, "tier" | "expires_at" | "created_at" | "metadata">,
   incomingTier: MemoryTier,
   now: string,
-): {
-  tier: MemoryTier;
-  expires_at: string | null;
-  metadata: Record<string, unknown>;
-} {
+  /** The caller's own metadata additions, e.g. merge_count. */
+  additions: Record<string, unknown> = {},
+): TierUpgrade {
   const tier = longerLivedTier(target.tier, incomingTier);
+  const base = { ...(target.metadata ?? {}), ...additions };
+
   if (tier === target.tier) {
-    return {
-      tier,
-      expires_at: target.expires_at ?? null,
-      metadata: target.metadata ?? {},
-    };
+    return { tier, expires_at: target.expires_at ?? null, metadata: base };
   }
 
   const fromDefault = defaultExpiresAt(tier, target.created_at);
@@ -62,14 +74,34 @@ export function resolveTierUpgrade(
     tier,
     expires_at,
     metadata: {
-      ...(target.metadata ?? {}),
-      // A row silently changing retention class is exactly the kind of thing
-      // that should be visible in the inspector rather than inferred.
+      ...base,
+      // Written last so a caller's additions cannot clobber the trace. A row
+      // silently changing retention class is exactly what the inspector should
+      // be able to explain rather than leave to inference.
       tier_upgraded_from: target.tier,
       tier_upgraded_to: tier,
       tier_upgraded_at: now,
     },
   };
+}
+
+/**
+ * Assert that an upgrade did not weaken effective lifetime.
+ *
+ * resolveTierUpgrade is constructed so this cannot fail, but it is checked
+ * rather than assumed: the previous version of that function was also believed
+ * correct and shortened an extended expiry by two years. Returns the weakened
+ * components, empty when lifetime held or grew.
+ */
+export function tierUpgradeRegression(
+  target: Pick<Memory, "tier" | "expires_at">,
+  upgrade: Pick<TierUpgrade, "tier" | "expires_at">,
+  cfg: UmgConfig,
+): string[] {
+  return lifetimeRegression(
+    effectiveLifetime(target, cfg),
+    effectiveLifetime({ tier: upgrade.tier, expires_at: upgrade.expires_at }, cfg),
+  );
 }
 
 export type MergeAction = "merge" | "defer" | "none";
