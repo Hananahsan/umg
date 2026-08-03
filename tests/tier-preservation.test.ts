@@ -159,6 +159,106 @@ describe("tier is never downgraded by a merge", () => {
     expect(skill?.expires_at ?? null).toBeNull();
   });
 
+  /**
+   * The tier upgrade mutates an existing row's tier, expires_at and
+   * decay_score — a mutation path that did not exist before 0.2.4. Clause D
+   * (no active row references a nonexistent row) has to survive it.
+   */
+  it("keeps references coherent across a tier upgrade", async () => {
+    app.close();
+    app = build((c) => {
+      c.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+      c.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
+    });
+
+    const base = await app.memory.retain({
+      content: TEXT, tier: "semantic", namespace: "r", skip_merge: true,
+    });
+    const referrer = await app.memory.retain({
+      content: "An unrelated fact that will carry a reference to the skill row",
+      tier: "semantic", namespace: "r", skip_merge: true,
+    });
+    await app.store.update(referrer.id!, {
+      parent_ids: [base.id!],
+      supersedes_id: base.id!,
+    });
+
+    // Same text at a longer-lived tier: triggers the upgrade on `base`.
+    await app.memory.retain({ content: TEXT, tier: "procedural", namespace: "r" });
+
+    const upgraded = await app.store.get(base.id!);
+    expect(upgraded?.id).toBe(base.id); // in-place, so references stay valid
+    expect(upgraded?.tier).toBe("procedural");
+
+    const all = await app.store.list({ namespace: "r", limit: 50 });
+    const ids = new Set(all.map((m) => m.id));
+    const ref = await app.store.get(referrer.id!);
+    expect(ref!.parent_ids.every((p) => ids.has(p))).toBe(true);
+    expect(ids.has(ref!.supersedes_id!)).toBe(true);
+  });
+
+  it("records the upgrade in metadata so it is not a silent change", async () => {
+    app.close();
+    app = build((c) => {
+      c.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+      c.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
+    });
+    await app.memory.retain({ content: TEXT, tier: "semantic", namespace: "m" });
+    await app.memory.retain({ content: TEXT, tier: "procedural", namespace: "m" });
+
+    const row = (await app.store.list({ namespace: "m", limit: 10 }))[0];
+    expect(row.metadata.tier_upgraded_from).toBe("semantic");
+    expect(row.metadata.tier_upgraded_to).toBe("procedural");
+    expect(row.metadata.tier_upgraded_at).toBeTruthy();
+  });
+
+  it("never shortens an expiry that was extended past the tier default", async () => {
+    // An upgrade recomputing expires_at from the tier default alone would
+    // revoke a manual extension: an episodic row extended to +1000d came back
+    // from a semantic upgrade expiring at created+365d, ~2 years earlier.
+    app.close();
+    app = build((c) => {
+      c.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+      c.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
+    });
+    const r = await app.memory.retain({
+      content: TEXT, tier: "episodic", namespace: "x2", skip_merge: true,
+    });
+    const farFuture = new Date(Date.now() + 1000 * 86_400_000).toISOString();
+    await app.store.update(r.id!, { expires_at: farFuture });
+
+    await app.memory.retain({ content: TEXT, tier: "semantic", namespace: "x2" });
+
+    const after = await app.store.get(r.id!);
+    expect(after!.tier).toBe("semantic");
+    expect(Date.parse(after!.expires_at!)).toBeGreaterThanOrEqual(
+      Date.parse(farFuture),
+    );
+  });
+
+  it("mergeCompatibleTiers stays asymmetric on purpose", async () => {
+    app.close();
+    app = build((c) => {
+      c.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+      c.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
+    });
+    // procedural -> semantic absorbs (and upgrades).
+    await app.memory.retain({ content: TEXT, tier: "semantic", namespace: "a1" });
+    const up = await app.memory.retain({
+      content: TEXT, tier: "procedural", namespace: "a1",
+    });
+    expect(up.action).toBe("merged");
+
+    // semantic -> procedural must NOT absorb: reaching the procedural tier is
+    // promote_to_skill's job, and it gates on recalls, sessions and importance.
+    // A hash collision must not be a back door around those gates.
+    await app.memory.retain({ content: TEXT, tier: "procedural", namespace: "a2" });
+    const down = await app.memory.retain({
+      content: TEXT, tier: "semantic", namespace: "a2",
+    });
+    expect(down.action).toBe("created");
+  });
+
   it("longerLivedTier orders every tier pair consistently", () => {
     for (const a of MEMORY_TIERS) {
       for (const b of MEMORY_TIERS) {

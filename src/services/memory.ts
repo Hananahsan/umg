@@ -9,7 +9,6 @@ import type {
   RetainResult,
   ScoredMemory,
 } from "../types.js";
-import { longerLivedTier } from "../types.js";
 import {
   autoTier,
   computeDecayScore,
@@ -19,7 +18,7 @@ import {
   rankForRecall,
 } from "./scoring.js";
 import { resolveWriteConflict } from "./contradiction.js";
-import { resolveMerge } from "./merge-policy.js";
+import { resolveMerge, resolveTierUpgrade } from "./merge-policy.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { extractEntities } from "../util/entities.js";
@@ -363,27 +362,25 @@ export class MemoryService {
       ...(target.parent_ids ?? []),
       target.id, // lineage marker if re-merged later still ok
     ]);
+    const now = nowIso();
+
+    // Never move a row down: tier takes the longer-lived of the two, expiry
+    // only ever moves later, and an upgrade leaves a metadata trace.
+    const upgrade = resolveTierUpgrade(target, incoming.tier, now);
+    const tier = upgrade.tier;
+
     const metadata = {
-      ...target.metadata,
+      // upgrade.metadata is target.metadata plus the tier_upgraded_* trace, so
+      // it has to be the base here — spreading target.metadata would drop it.
+      ...upgrade.metadata,
       ...(incoming.metadata ?? {}),
       merge_count: Number(target.metadata?.merge_count ?? 0) + 1,
     };
-    const now = nowIso();
-
-    // Never move a row down. Re-asserting a fact at a longer-lived tier is a
-    // strengthening signal, so the merged row takes the longer-lived tier —
-    // and its expiry has to be recomputed with it, or an upgraded row keeps
-    // the shorter tier's TTL and expires anyway.
-    const tier = longerLivedTier(target.tier, incoming.tier);
-    const expires_at =
-      tier === target.tier
-        ? target.expires_at
-        : defaultExpiresAt(tier, target.created_at);
 
     return this.store.update(target.id, {
       content,
       tier,
-      expires_at,
+      expires_at: upgrade.expires_at,
       summary: summarize(content),
       tags,
       entities,
@@ -524,6 +521,28 @@ export class MemoryService {
   }
 }
 
+/**
+ * Which tiers an incoming write may be absorbed into.
+ *
+ * THE ASYMMETRY IS DELIBERATE. It is not an oversight, and "fixing" it by
+ * making the map symmetric reopens two different bugs:
+ *
+ *  - `procedural` lists `semantic`, but `semantic` does NOT list `procedural`.
+ *    Blocking procedural → semantic stops a downgrade: a skill absorbed into a
+ *    semantic row loses the 730d half-life and the 0.4 decay floor. Blocking
+ *    semantic → procedural stops something worse — promotion into `procedural`
+ *    is `promote_to_skill`'s job, and it gates on recall count, distinct
+ *    sessions and average importance. A lexical hash collision must not be a
+ *    back door into the skill tier that skips all three.
+ *
+ *  - `working` is absent from `procedural`'s list for the same downgrade
+ *    reason, and that absence is load-bearing: until 0.2.4 the exact-hash
+ *    branch of findSimilar ignored this map entirely, so a skill was absorbed
+ *    into a working row and expired 24 hours later.
+ *
+ * The cost is that identical text can sit in two tiers at once. That is
+ * accepted: a duplicate row is prune's problem, a lost skill is nobody's.
+ */
 function mergeCompatibleTiers(tier: MemoryTier): MemoryTier[] {
   switch (tier) {
     case "working":

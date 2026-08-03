@@ -1,10 +1,10 @@
 import type { UmgConfig } from "../config.js";
 import type { MemoryStore } from "../store/interface.js";
 import type { Memory, MemoryTier, PruneResult } from "../types.js";
-import { longerLivedTier, MEMORY_TIERS } from "../types.js";
-import { computeDecayScore, defaultExpiresAt } from "./scoring.js";
+import { MEMORY_TIERS } from "../types.js";
+import { computeDecayScore } from "./scoring.js";
 import { resolveWriteConflict } from "./contradiction.js";
-import { resolveMerge } from "./merge-policy.js";
+import { resolveMerge, resolveTierUpgrade } from "./merge-policy.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { addDaysIso, nowIso, truncate, uniqueStrings } from "../util/text.js";
@@ -411,20 +411,16 @@ export class ConsolidationService {
         : target.content;
     const now = nowIso();
 
-    // Never move a row down: the merged row takes the longer-lived of the two
-    // tiers, and its expiry is recomputed to match. Without this a prune could
-    // fold a procedural memory into a working one and hand the survivor a 24h
-    // TTL — the same downgrade the write path had.
-    const tier = longerLivedTier(target.tier, source.tier);
-    const expires_at =
-      tier === target.tier
-        ? target.expires_at
-        : defaultExpiresAt(tier, target.created_at);
+    // Never move a row down. Without this a prune could fold a procedural
+    // memory into a working one and hand the survivor a 24h TTL — the same
+    // downgrade the write path had.
+    const upgrade = resolveTierUpgrade(target, source.tier, now);
+    const tier = upgrade.tier;
 
     return this.store.update(target.id, {
       content,
       tier,
-      expires_at,
+      expires_at: upgrade.expires_at,
       summary: content.slice(0, 160),
       tags: uniqueStrings([...target.tags, ...source.tags]),
       entities: uniqueStrings([...target.entities, ...source.entities]),
@@ -438,7 +434,7 @@ export class ConsolidationService {
       last_accessed_at: now,
       updated_at: now,
       metadata: {
-        ...target.metadata,
+        ...upgrade.metadata,
         ...source.metadata,
         merge_count:
           Number(target.metadata?.merge_count ?? 0) +

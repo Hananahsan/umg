@@ -1,4 +1,6 @@
 import { extractValueSlots, type WriteConflictResolution } from "./contradiction.js";
+import { defaultExpiresAt } from "./scoring.js";
+import { longerLivedTier, type Memory, type MemoryTier } from "../types.js";
 import { normalizeEntityText, normalizeEntityToken } from "../util/entity-normalize.js";
 import { tokenize } from "../util/text.js";
 
@@ -15,6 +17,60 @@ import { tokenize } from "../util/text.js";
  * So merging now requires positive confidence that the two state the same
  * fact, and anything short of that keeps both rows and records why.
  */
+
+/**
+ * The tier and expiry a row should end up with after absorbing a write at
+ * `incomingTier`, plus a metadata trace when it changed.
+ *
+ * Two rules, both clause B ("retention class never silently weakens"):
+ *
+ *  - tier only ever moves to the longer-lived of the two;
+ *  - expiry only ever moves later. Recomputing it from the tier default alone
+ *    is not safe: a row whose expires_at was extended past its tier default
+ *    would have that extension revoked by an *upgrade*. Measured, an episodic
+ *    row extended to 2029 came back from a semantic upgrade expiring in 2027.
+ */
+export function resolveTierUpgrade(
+  target: Pick<Memory, "tier" | "expires_at" | "created_at" | "metadata">,
+  incomingTier: MemoryTier,
+  now: string,
+): {
+  tier: MemoryTier;
+  expires_at: string | null;
+  metadata: Record<string, unknown>;
+} {
+  const tier = longerLivedTier(target.tier, incomingTier);
+  if (tier === target.tier) {
+    return {
+      tier,
+      expires_at: target.expires_at ?? null,
+      metadata: target.metadata ?? {},
+    };
+  }
+
+  const fromDefault = defaultExpiresAt(tier, target.created_at);
+  const current = target.expires_at ?? null;
+  // null means "never expires", which outranks any date on both sides.
+  const expires_at =
+    fromDefault === null || current === null
+      ? null
+      : current > fromDefault
+        ? current
+        : fromDefault;
+
+  return {
+    tier,
+    expires_at,
+    metadata: {
+      ...(target.metadata ?? {}),
+      // A row silently changing retention class is exactly the kind of thing
+      // that should be visible in the inspector rather than inferred.
+      tier_upgraded_from: target.tier,
+      tier_upgraded_to: tier,
+      tier_upgraded_at: now,
+    },
+  };
+}
 
 export type MergeAction = "merge" | "defer" | "none";
 
