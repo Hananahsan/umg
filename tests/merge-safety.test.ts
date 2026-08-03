@@ -4,6 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp, type UmgApp } from "../src/app.js";
 import { defaultConfig, MERGE_SAFETY_THRESHOLD } from "../src/config.js";
+import {
+  MUST_NOT_COLLAPSE,
+  SCOPE_DISTINCT,
+} from "./fixtures/labeled-pairs.js";
 
 /**
  * Merge discards a memory on a bare threshold — no confidence gate, no
@@ -101,6 +105,87 @@ describe("merge safety", () => {
       expect(left.map((m) => m.content).sort()).toEqual([a, b].sort());
     },
   );
+
+  /**
+   * The property step 3 exists for. Before merge was gated, the only thing
+   * standing between a distinct fact and deletion was the threshold, so the
+   * threshold had to be set high enough to disable merging entirely. Now the
+   * blocks are structural: scope divergence, differing value slots and
+   * two-sided content all veto a merge regardless of how similar the pair
+   * looks. Run the whole must-not-collapse corpus at a threshold low enough
+   * that a bare comparison would collapse most of it.
+   */
+  it.each(MUST_NOT_COLLAPSE)(
+    "survives a reckless threshold: $note",
+    async ({ a, b }) => {
+      app.close();
+      const cfg = defaultConfig();
+      cfg.db_path = join(dir, "reckless.db");
+      cfg.log_level = "error";
+      cfg.consolidation.light_prune_every_n_writes = 0;
+      cfg.consolidation.auto_promote = false;
+      cfg.consolidation.merge_threshold = 0.6;
+      app = createApp({ cfg });
+
+      await seedPair("reckless", a, b);
+      await app.consolidation.prune({ namespace: "reckless" });
+      const left = await app.store.list({
+        namespace: "reckless",
+        status: "active",
+        limit: 10,
+      });
+      expect(left.map((m) => m.content).sort()).toEqual([a, b].sort());
+    },
+  );
+
+  it("records why a merge was withheld instead of silently skipping", async () => {
+    const cfgLow = 0.6;
+    app.close();
+    const cfg = defaultConfig();
+    cfg.db_path = join(dir, "deferred.db");
+    cfg.log_level = "error";
+    cfg.consolidation.light_prune_every_n_writes = 0;
+    cfg.consolidation.auto_promote = false;
+    cfg.consolidation.merge_threshold = cfgLow;
+    app = createApp({ cfg });
+
+    const [a, b] = [SCOPE_DISTINCT[0].a, SCOPE_DISTINCT[0].b];
+    await seedPair("why", a, b);
+    const result = await app.consolidation.prune({
+      namespace: "why",
+      dry_run: true,
+    });
+
+    const withheld = result.details.find((d) => d.action === "merge_deferred");
+    expect(withheld, "expected a merge_deferred record").toBeTruthy();
+    expect(withheld?.reason).toBe("scope_divergent");
+    expect(String(withheld?.detail)).toContain("staging");
+  });
+
+  it("stamps merge_deferred on the write path too", async () => {
+    app.close();
+    const cfg = defaultConfig();
+    cfg.db_path = join(dir, "write.db");
+    cfg.log_level = "error";
+    cfg.consolidation.light_prune_every_n_writes = 0;
+    cfg.consolidation.merge_threshold = 0.6;
+    app = createApp({ cfg });
+
+    await app.memory.retain({
+      content: SCOPE_DISTINCT[0].a,
+      tier: "semantic",
+      namespace: "wp",
+    });
+    const second = await app.memory.retain({
+      content: SCOPE_DISTINCT[0].b,
+      tier: "semantic",
+      namespace: "wp",
+    });
+
+    expect(second.action).toBe("created");
+    expect(second.memory?.metadata?.merge_deferred).toBe(true);
+    expect(second.memory?.metadata?.merge_reason).toBe("scope_divergent");
+  });
 
   it("does not let --aggressive reopen the merge hole", async () => {
     // The staging/production pair scores 0.8455 and used to be collapsed;

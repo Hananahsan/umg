@@ -4,6 +4,7 @@ import type { Memory, MemoryTier, PruneResult } from "../types.js";
 import { MEMORY_TIERS } from "../types.js";
 import { computeDecayScore } from "./scoring.js";
 import { resolveWriteConflict } from "./contradiction.js";
+import { resolveMerge } from "./merge-policy.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { addDaysIso, nowIso, truncate, uniqueStrings } from "../util/text.js";
@@ -179,7 +180,35 @@ export class ConsolidationService {
               break;
             }
 
-            if (similarity < mergeThreshold) continue;
+            const mergeDecision = resolveMerge(
+              m.content,
+              s.content,
+              similarity,
+              decision,
+              mergeThreshold,
+              this.cfg.consolidation.merge_min_confidence,
+            );
+
+            if (mergeDecision.action === "none") continue;
+
+            if (mergeDecision.action === "defer") {
+              // Similar enough to be a candidate, not confident enough to
+              // discard one of them. Keep both and say why.
+              details.push({
+                action: "merge_deferred",
+                reason: mergeDecision.reason,
+                detail: mergeDecision.detail,
+                a: m.id,
+                b: s.id,
+                score: similarity,
+                confidence: mergeDecision.confidence,
+                pass,
+              });
+              // Do not re-evaluate this pair on later passes; nothing changed.
+              mergeSeen.add(s.id);
+              continue;
+            }
+
             const target = pickMergeTarget(m, s);
             const source = target.id === m.id ? s : m;
             if (target.id === source.id) continue;
@@ -190,6 +219,7 @@ export class ConsolidationService {
               into: target.id,
               from: source.id,
               score: similarity,
+              confidence: mergeDecision.confidence,
               pass,
             });
             merged++;

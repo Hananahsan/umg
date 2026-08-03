@@ -33,6 +33,8 @@ export interface UmgConfig {
   };
   consolidation: {
     merge_threshold: number;
+    /** Mirrors supersede_min_confidence: below this, keep both and defer. */
+    merge_min_confidence: number;
     merge_max_passes: number;
     light_prune_every_n_writes: number;
     eviction_floor: number;
@@ -151,6 +153,7 @@ const DEFAULTS: UmgConfig = {
      * the correct direction until merge is made fail-safe.
      */
     merge_threshold: MERGE_SAFETY_THRESHOLD,
+    merge_min_confidence: 0.75,
     merge_max_passes: 3,
     light_prune_every_n_writes: 25,
     eviction_floor: 0.12,

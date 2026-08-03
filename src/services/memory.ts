@@ -18,6 +18,7 @@ import {
   rankForRecall,
 } from "./scoring.js";
 import { resolveWriteConflict } from "./contradiction.js";
+import { resolveMerge } from "./merge-policy.js";
 import { emitEvent } from "../observability/events.js";
 import { log } from "../util/log.js";
 import { extractEntities } from "../util/entities.js";
@@ -139,6 +140,14 @@ export class MemoryService {
           threshold,
           this.cfg.consolidation.supersede_min_confidence,
         );
+        const mergeDecision = resolveMerge(
+          body,
+          best.content,
+          best.score,
+          decision,
+          threshold,
+          this.cfg.consolidation.merge_min_confidence,
+        );
 
         // CLEAR contradiction only: archive prior, link lineage
         if (decision.action === "supersede") {
@@ -183,7 +192,32 @@ export class MemoryService {
             },
             best.id,
           );
-        } else if (best.score >= threshold) {
+        } else if (mergeDecision.action === "defer") {
+          // Similar enough to look like a duplicate, not confident enough to
+          // discard either one — different subjects, differing values, or both
+          // sides carrying content the other lacks. Keep both, exactly as an
+          // ambiguous conflict does.
+          deferredMeta = {
+            merge_deferred: true,
+            related_memory_id: best.id,
+            merge_reason: mergeDecision.reason,
+            merge_detail: mergeDecision.detail,
+            similarity: best.score,
+          };
+          await emitEvent(
+            this.store,
+            this.cfg,
+            "retain",
+            {
+              reason: "merge_deferred",
+              related_id: best.id,
+              merge_reason: mergeDecision.reason,
+              detail: mergeDecision.detail,
+              preview: truncate(body, 100),
+            },
+            best.id,
+          );
+        } else if (mergeDecision.action === "merge") {
           // Near-duplicate, no contradiction → merge
           const merged = await this.mergeInto(best, {
             content: body,
