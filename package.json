@@ -1,6 +1,6 @@
 {
   "name": "@umg0/umg0",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Unified Memory Gateway — MCP-first, local-first hierarchical memory for AI agents",
   "type": "module",
   "bin": {

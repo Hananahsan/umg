@@ -27,6 +27,11 @@ describe("write path composition", () => {
     cfg.db_path = join(dir, "test.db");
     cfg.log_level = "error";
     cfg.retain.min_importance.semantic = 0.3;
+    // Pinned to the pre-0.2.3 default so the composed path still has a merge
+    // step to exercise. The shipped default is a safety value (0.95) under
+    // which this near-duplicate stays split by design — see
+    // MERGE_SAFETY_THRESHOLD and tests/merge-safety.test.ts.
+    cfg.consolidation.merge_threshold = 0.82;
     app = createApp({ cfg });
   });
 

@@ -28,7 +28,14 @@ recall:
     entity: 0.16
 
 consolidation:
-  merge_threshold: 0.82
+  # TEMPORARY SAFETY VALUE, not a tuned one. Merge discards a memory once this
+  # score is crossed, with no confidence gate and no additive fallback — unlike
+  # supersede. On the current similarity scale true duplicates and distinct
+  # facts overlap, so at the old 0.82 default merge was deleting real facts
+  # (e.g. a staging URL absorbing a production URL) while leaving genuine
+  # duplicates split. 0.95 sits above both classes, so only exact and
+  # near-identical duplicates collapse. Lowering it re-enables the data loss.
+  merge_threshold: 0.95
   merge_max_passes: 3
   light_prune_every_n_writes: 25
   eviction_floor: 0.12

@@ -45,9 +45,12 @@ export class ConsolidationService {
     const floor = aggressive
       ? this.cfg.consolidation.eviction_floor * 1.5
       : this.cfg.consolidation.eviction_floor;
-    const mergeThreshold = aggressive
-      ? Math.max(0.7, this.cfg.consolidation.merge_threshold - 0.05)
-      : this.cfg.consolidation.merge_threshold;
+    // --aggressive used to shave 0.05 off the merge threshold. While merge is
+    // held at a provisional safety value (see MERGE_SAFETY_THRESHOLD) that
+    // reduction would walk it straight back into the range where distinct
+    // facts get collapsed, so aggressive now only raises eviction pressure.
+    // Restore the reduction once merge defers instead of discarding.
+    const mergeThreshold = this.cfg.consolidation.merge_threshold;
     const maxPasses = Math.max(
       1,
       this.cfg.consolidation.merge_max_passes ?? 3,

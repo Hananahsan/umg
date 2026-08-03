@@ -85,6 +85,24 @@ export interface UmgConfig {
   };
 }
 
+/**
+ * Provisional merge threshold. Merge currently lacks the safety machinery the
+ * write path has everywhere else: supersede is confidence-gated and falls back
+ * to additive on ambiguity, but merge is a bare threshold — above it, one
+ * memory is discarded and its content is gone.
+ *
+ * Until merge is confidence-gated and defers instead of discarding, this is
+ * held high enough that effectively only exact and near-identical duplicates
+ * collapse. It is a safety measure, not a calibrated value; do not tune it
+ * without a labeled corpus.
+ */
+export const MERGE_SAFETY_THRESHOLD = 0.95;
+
+export const MERGE_SAFETY_NOTE =
+  "merge_threshold is a provisional safety value (0.95), not a tuned one: " +
+  "merge discards a memory on a bare threshold, and true duplicates overlap " +
+  "with distinct facts on the current similarity scale.";
+
 export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
   fts: 0.32,
   importance: 0.18,
@@ -115,7 +133,24 @@ const DEFAULTS: UmgConfig = {
     ranking_weights: { ...DEFAULT_RANKING_WEIGHTS },
   },
   consolidation: {
-    merge_threshold: 0.82,
+    /**
+     * TEMPORARY SAFETY VALUE — not a tuned threshold. See MERGE_SAFETY_NOTE.
+     *
+     * At the previous default of 0.82 merge was destroying data: the pair
+     * "The staging API base URL is https://staging.example.com/v1" and
+     * "The production API base URL is https://api.example.com/v1" scores
+     * 0.8455 on this scale and was collapsed into one row, silently deleting
+     * the production URL. Meanwhile genuine duplicates scoring 0.62–0.81 were
+     * left alone, so 0.82 produced bloat and data loss at the same time.
+     *
+     * Measured against a labeled corpus, true duplicates and distinct facts
+     * overlap on this scale, so no threshold separates them — see
+     * tests/merge-safety.test.ts. 0.95 is chosen to sit above everything the
+     * corpus produces, which means only exact-hash duplicates and
+     * near-identical text still merge. That trades bloat for safety, which is
+     * the correct direction until merge is made fail-safe.
+     */
+    merge_threshold: MERGE_SAFETY_THRESHOLD,
     merge_max_passes: 3,
     light_prune_every_n_writes: 25,
     eviction_floor: 0.12,

@@ -109,8 +109,19 @@ Agent-supplied importance is soft-blended (70/30).
 
 On write and full prune: Jaccard + FTS candidates.
 
-- **Merge** when similarity ≥ `merge_threshold` (default 0.82) and no contradiction.  
+- **Merge** when similarity ≥ `merge_threshold` and no contradiction.  
   Keep richer content, max importance, union tags/entities, lineage via `parent_ids`.
+
+  > **Merge is provisionally disabled by a high threshold (0.95).** Unlike supersede
+  > it has no confidence gate and no additive fallback: cross the threshold and one
+  > memory is discarded. Similarity is `0.85·jaccard + 0.15·entityOverlap`, a purely
+  > lexical scale on which "same fact reworded" and "same template, different value"
+  > overlap — measured, a distinct staging/production URL pair scored 0.8455 while
+  > genuine duplicates scored 0.62–0.81. At the old 0.82 default that produced bloat
+  > and silent data loss simultaneously. 0.95 sits above both classes so only exact
+  > and near-identical duplicates collapse. Restoring a tuned threshold requires
+  > `extractValueSlots` to divert template-identical/value-different pairs to the
+  > contradiction path, and merge to defer rather than discard on ambiguity.
 - **Supersede** only on **clear** related contradictions (`conflicting_values`, `boolean_flip`,
   or strong negation/correction with high topic overlap). Archive loser; set `supersedes_id`.
 - **Defer (additive-first)** on ambiguous conflicts: insert the new memory, leave prior active,
