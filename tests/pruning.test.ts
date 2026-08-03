@@ -227,6 +227,13 @@ describe("pruning and decay", () => {
         .filter((d) => d.action === "merge" || d.action === "supersede")
         .map((d) => `${d.action}:${d.into}->${d.from}`);
 
+      // Vacuity guard. This test was written while merge was silently not
+      // firing, so `dry.merged === real.merged` would have been 0 === 0 and
+      // looked green while asserting nothing. Fail loudly if the fixture stops
+      // producing merges instead of quietly becoming a no-op.
+      expect(dry.merged).toBeGreaterThan(0);
+      expect(pairs.length).toBeGreaterThan(0);
+
       // findSimilar reads the database, which on a dry run still shows the
       // loser as active — each pass used to re-detect the same pair.
       expect(new Set(pairs).size).toBe(pairs.length);
