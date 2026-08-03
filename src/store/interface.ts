@@ -48,5 +48,8 @@ export interface MemoryStore {
   vacuum(): void;
   listArchived(limit?: number): Promise<Memory[]>;
 
+  /** Whether BM25 search is live. False means the degraded LIKE fallback is in use. */
+  isFtsAvailable(): boolean;
+
   close(): void;
 }

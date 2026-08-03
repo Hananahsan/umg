@@ -15,6 +15,7 @@ import type {
 } from "../../types.js";
 import { MEMORY_TIERS } from "../../types.js";
 import { migrate } from "./migrations.js";
+import { FTS_PROBE_SQL } from "./schema.js";
 import { contentHash, jaccard, normalizeText, toFtsQuery, tokenize } from "../../util/text.js";
 import { log } from "../../util/log.js";
 import { ensureDbDir, type UmgConfig } from "../../config.js";
@@ -113,11 +114,21 @@ export class SqliteMemoryStore implements MemoryStore {
     this.db.pragma(`busy_timeout = ${busy}`);
     migrate(this.db);
     try {
-      this.db.prepare("SELECT 1 FROM memories_fts LIMIT 1").get();
-    } catch {
+      this.db.prepare(FTS_PROBE_SQL).get();
+    } catch (err) {
       this.ftsAvailable = false;
-      log.warn("FTS5 not available; using LIKE fallback");
+      // Loud on purpose: this drops BM25 ranking for every search and degrades
+      // near-duplicate detection, so it must never pass as routine noise.
+      log.error("FTS5 unavailable; falling back to LIKE + Jaccard (search quality degraded)", {
+        error: String(err),
+        db: this.dbPath,
+      });
     }
+  }
+
+  /** Whether BM25 search is live. False means the degraded LIKE fallback is in use. */
+  isFtsAvailable(): boolean {
+    return this.ftsAvailable;
   }
 
   transaction<T>(fn: () => T): T {
@@ -301,8 +312,12 @@ export class SqliteMemoryStore implements MemoryStore {
 
     let results: ScoredMemory[] = rows.map((r) => {
       const mem = rowToMemory(r);
-      // bm25 in sqlite is lower-is-better; invert & normalize
-      const fts = 1 - Math.min(1, Math.abs(r.bm25_score) / maxAbs);
+      // SQLite bm25() returns negatives where a *more* negative value is a better
+      // match, so |bm25| is already higher-is-better. Scale it to [0,1] against the
+      // best hit in this result set. `rankForRecall` treats this value as
+      // interchangeable with `jaccard`, which is higher-is-better, so the
+      // orientation has to match or the whole ranking flips.
+      const fts = Math.min(1, Math.abs(r.bm25_score) / maxAbs);
       const score = fts;
       return { ...mem, score, score_breakdown: { fts } };
     });

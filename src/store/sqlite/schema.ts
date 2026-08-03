@@ -1,5 +1,5 @@
 /** Schema version for migrations. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -56,20 +56,26 @@ CREATE INDEX IF NOT EXISTS idx_events_kind ON events(kind);
 
 /**
  * FTS5 uses content-sync triggers so the row table stays source of truth.
- * We store a denormalized tags/entities string for search.
+ * We index the raw tags/entities JSON so their tokens are searchable.
+ *
+ * The column names MUST match `memories` exactly. In external-content mode
+ * (content='memories') FTS5 resolves column values by selecting identically
+ * named columns from the content table, so a column named `tags` here — where
+ * `memories` has `tags_json` — makes every external-content read fail with
+ * "no such column: T.tags". That includes table scans and 'rebuild'.
  */
 export const FTS_SQL = `
 CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
   content,
   summary,
-  tags,
-  entities,
+  tags_json,
+  entities_json,
   content='memories',
   content_rowid='rowid'
 );
 
 CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
-  INSERT INTO memories_fts(rowid, content, summary, tags, entities)
+  INSERT INTO memories_fts(rowid, content, summary, tags_json, entities_json)
   VALUES (
     new.rowid,
     new.content,
@@ -80,7 +86,7 @@ CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
-  INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags, entities)
+  INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags_json, entities_json)
   VALUES (
     'delete',
     old.rowid,
@@ -92,7 +98,7 @@ CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
-  INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags, entities)
+  INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags_json, entities_json)
   VALUES (
     'delete',
     old.rowid,
@@ -101,7 +107,7 @@ CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
     old.tags_json,
     old.entities_json
   );
-  INSERT INTO memories_fts(rowid, content, summary, tags, entities)
+  INSERT INTO memories_fts(rowid, content, summary, tags_json, entities_json)
   VALUES (
     new.rowid,
     new.content,
@@ -111,3 +117,17 @@ CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
   );
 END;
 `;
+
+/** Tear down the FTS table and its sync triggers so FTS_SQL can recreate them. */
+export const FTS_DROP_SQL = `
+DROP TRIGGER IF EXISTS memories_ai;
+DROP TRIGGER IF EXISTS memories_ad;
+DROP TRIGGER IF EXISTS memories_au;
+DROP TABLE IF EXISTS memories_fts;
+`;
+
+/**
+ * Cheap probe that exercises external-content column resolution. It fails on an
+ * empty table too, so a fresh database still catches a column-name mismatch.
+ */
+export const FTS_PROBE_SQL = `SELECT 1 FROM memories_fts LIMIT 1`;
