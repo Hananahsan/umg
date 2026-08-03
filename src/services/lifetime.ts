@@ -1,5 +1,6 @@
 import type { UmgConfig } from "../config.js";
 import type { Memory, MemoryTier } from "../types.js";
+import { defaultExpiresAt } from "./scoring.js";
 
 /**
  * How long a memory is expected to survive, as a comparable structure.
@@ -77,6 +78,39 @@ export function lifetimeRegression(
   if (after.decay_floor < before.decay_floor) weakened.push("decay_floor");
 
   return weakened;
+}
+
+/**
+ * The expiry a write should leave behind, whether it creates a row or is
+ * absorbed into one.
+ *
+ * Expiry counts from the write, not from the row's creation. That is a
+ * deliberate model choice and it fixes a real asymmetry: `defaultExpiresAt`
+ * was called with `now` when creating and with `target.created_at` when
+ * upgrading, so the same text at the same tier landed with different
+ * lifetimes depending purely on whether it happened to collide with an
+ * existing row. Measured against a 20-day-old row, the colliding write
+ * expired in 10 days and the non-colliding one in 30 — and the colliding
+ * write is the one that carried *more* evidence of relevance, since it was
+ * the second assertion of the same fact.
+ *
+ * Re-assertion therefore extends expiry, which matches the access_factor
+ * half of the decay model: being written again is being used again.
+ *
+ * The result never moves earlier than `current`, so clause B holds by
+ * construction — including for expiries extended past the tier default by
+ * hand.
+ */
+export function expiryForWrite(
+  tier: MemoryTier,
+  now: string,
+  current?: string | null,
+): string | null {
+  const fromTier = defaultExpiresAt(tier, now);
+  // null means "never expires" and dominates on either side.
+  if (fromTier === null || current === null) return null;
+  if (current === undefined) return fromTier;
+  return current > fromTier ? current : fromTier;
 }
 
 /**

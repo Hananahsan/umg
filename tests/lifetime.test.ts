@@ -3,6 +3,7 @@ import { defaultConfig } from "../src/config.js";
 import {
   capHeadroom,
   effectiveLifetime,
+  expiryForWrite,
   lifetimeRegression,
 } from "../src/services/lifetime.js";
 import {
@@ -118,6 +119,50 @@ describe("resolveTierUpgrade never weakens lifetime", () => {
     expect(upgrade.tier).toBe("semantic");
     expect(upgrade.metadata.merge_count).toBe(1);
     expect(upgrade.metadata.tier_upgraded_from).toBeUndefined();
+  });
+});
+
+describe("create and upgrade agree on expiry", () => {
+  /**
+   * 0.2.4 added a path where an incoming write upgrades an existing row rather
+   * than creating one. Creation derived expiry from `now`, the upgrade from
+   * `target.created_at` — so identical input landed with different lifetimes
+   * depending on whether it happened to collide. Measured against a 20-day-old
+   * row: 10 days if it collided, 30 if it did not, with the colliding write
+   * being the one carrying more evidence of relevance.
+   */
+  it.each(MEMORY_TIERS)(
+    "gives %s the same expiry whether it creates or is absorbed",
+    (tier) => {
+      const created = expiryForWrite(tier, NOW);
+      // An existing row of the same tier, 20 days old, whose expiry was set
+      // from its own creation date.
+      const agedRow = row(
+        tier,
+        expiryForWrite(tier, new Date(Date.parse(NOW) - 20 * 86_400_000).toISOString()),
+      );
+      const upgraded = resolveTierUpgrade(agedRow, tier, NOW);
+      expect(upgraded.expires_at).toBe(created);
+    },
+  );
+
+  it("extends expiry on re-assertion rather than leaving it to run out", () => {
+    const old = expiryForWrite(
+      "episodic",
+      new Date(Date.parse(NOW) - 20 * 86_400_000).toISOString(),
+    );
+    const extended = expiryForWrite("episodic", NOW, old);
+    expect(Date.parse(extended!)).toBeGreaterThan(Date.parse(old!));
+  });
+
+  it("still refuses to shorten a hand-extended expiry", () => {
+    const far = "2099-01-01T00:00:00.000Z";
+    expect(expiryForWrite("episodic", NOW, far)).toBe(far);
+  });
+
+  it("keeps never-expires as never", () => {
+    expect(expiryForWrite("procedural", NOW)).toBeNull();
+    expect(expiryForWrite("episodic", NOW, null)).toBeNull();
   });
 });
 

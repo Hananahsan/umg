@@ -13,10 +13,10 @@ import {
   autoTier,
   computeDecayScore,
   computeImportance,
-  defaultExpiresAt,
   isLowInformation,
   rankForRecall,
 } from "./scoring.js";
+import { expiryForWrite } from "./lifetime.js";
 import { resolveWriteConflict } from "./contradiction.js";
 import { resolveMerge, resolveTierUpgrade } from "./merge-policy.js";
 import { emitEvent } from "../observability/events.js";
@@ -275,7 +275,8 @@ export class MemoryService {
       last_accessed_at: now,
       created_at: now,
       updated_at: now,
-      expires_at: defaultExpiresAt(tier, now),
+      // Same derivation the upgrade path uses; see expiryForWrite.
+      expires_at: expiryForWrite(tier, now),
       decay_score: importance,
       embedding,
       metadata: {

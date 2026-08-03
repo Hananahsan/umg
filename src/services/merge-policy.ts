@@ -1,6 +1,9 @@
 import { extractValueSlots, type WriteConflictResolution } from "./contradiction.js";
-import { defaultExpiresAt } from "./scoring.js";
-import { effectiveLifetime, lifetimeRegression } from "./lifetime.js";
+import {
+  effectiveLifetime,
+  expiryForWrite,
+  lifetimeRegression,
+} from "./lifetime.js";
 import type { UmgConfig } from "../config.js";
 import { longerLivedTier, type Memory, type MemoryTier } from "../types.js";
 import { normalizeEntityText, normalizeEntityToken } from "../util/entity-normalize.js";
@@ -56,19 +59,13 @@ export function resolveTierUpgrade(
   const tier = longerLivedTier(target.tier, incomingTier);
   const base = { ...(target.metadata ?? {}), ...additions };
 
-  if (tier === target.tier) {
-    return { tier, expires_at: target.expires_at ?? null, metadata: base };
-  }
+  // Same function the create path uses, so an absorbed write and a fresh one
+  // leave the same expiry for the same input.
+  const expires_at = expiryForWrite(tier, now, target.expires_at ?? null);
 
-  const fromDefault = defaultExpiresAt(tier, target.created_at);
-  const current = target.expires_at ?? null;
-  // null means "never expires", which outranks any date on both sides.
-  const expires_at =
-    fromDefault === null || current === null
-      ? null
-      : current > fromDefault
-        ? current
-        : fromDefault;
+  if (tier === target.tier) {
+    return { tier, expires_at, metadata: base };
+  }
 
   return {
     tier,
