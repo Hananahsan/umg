@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "inspector",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "npm run build && node dist/index.js inspect --port 7788 --demo --no-open"
+      ],
+      "port": 7788
+    },
+    {
+      "name": "inspector-ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "inspector-ui", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "site",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "site", "run", "dev"],
+      "port": 4321
+    }
+  ]
+}
