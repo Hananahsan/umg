@@ -9,6 +9,7 @@ import type {
   RetainResult,
   ScoredMemory,
 } from "../types.js";
+import { longerLivedTier } from "../types.js";
 import {
   autoTier,
   computeDecayScore,
@@ -222,6 +223,7 @@ export class MemoryService {
           const merged = await this.mergeInto(best, {
             content: body,
             importance,
+            tier,
             tags: input.tags,
             entities,
             session_id: input.session_id,
@@ -333,6 +335,7 @@ export class MemoryService {
     incoming: {
       content: string;
       importance: number;
+      tier: MemoryTier;
       tags?: string[];
       entities?: string[];
       session_id?: string;
@@ -366,8 +369,21 @@ export class MemoryService {
       merge_count: Number(target.metadata?.merge_count ?? 0) + 1,
     };
     const now = nowIso();
+
+    // Never move a row down. Re-asserting a fact at a longer-lived tier is a
+    // strengthening signal, so the merged row takes the longer-lived tier —
+    // and its expiry has to be recomputed with it, or an upgraded row keeps
+    // the shorter tier's TTL and expires anyway.
+    const tier = longerLivedTier(target.tier, incoming.tier);
+    const expires_at =
+      tier === target.tier
+        ? target.expires_at
+        : defaultExpiresAt(tier, target.created_at);
+
     return this.store.update(target.id, {
       content,
+      tier,
+      expires_at,
       summary: summarize(content),
       tags,
       entities,
@@ -380,7 +396,15 @@ export class MemoryService {
       updated_at: now,
       last_accessed_at: now,
       decay_score: computeDecayScore(
-        { ...target, importance, last_accessed_at: now, access_count: target.access_count + 1 },
+        {
+          ...target,
+          // Recomputed against the merged tier: half-life and the procedural
+          // floor both depend on it.
+          tier,
+          importance,
+          last_accessed_at: now,
+          access_count: target.access_count + 1,
+        },
         this.cfg,
         now,
       ),

@@ -90,33 +90,34 @@ export interface UmgConfig {
 /**
  * Similarity below which a pair is not even considered for merging.
  *
- * This is a cheap pre-filter, not the decision. The decision is
- * MERGE_MIN_CONFIDENCE below, applied after resolveMerge() has vetoed pairs
- * that are scoped to different subjects, assert different values, or carry
- * content on both sides.
+ * HELD AT THE 0.2.3 SAFETY VALUE. A calibration against
+ * tests/fixtures/labeled-pairs.ts put this at 0.55, but that corpus is 24
+ * hand-written pairs — effectively 11 once structurally vetoed pairs are
+ * removed, of which only 4 are unrelated. Four samples with none above the
+ * line says almost nothing about the true exceedance rate, so the measured
+ * value is not being shipped. The machinery it was measured against
+ * (resolveMerge's vetoes) is in place and only ever prevents merges, so
+ * holding the threshold high costs nothing but duplicate rows.
  *
- * Calibrated against tests/fixtures/labeled-pairs.ts: unrelated pairs top out
- * at 0.4722 similarity, so 0.55 keeps them from ever reaching the gate.
+ * Lowering this waits on decision logging from real writes. The intended next
+ * step is 0.75, not 0.55.
  */
-export const MERGE_THRESHOLD = 0.55;
+export const MERGE_THRESHOLD = 0.95;
 
 /**
  * Confidence required to discard one of two memories.
  *
- * Measured on the labeled corpus, with structural vetoes applied first:
+ * Measured on the labeled corpus, with the structural vetoes applied first:
  *
  *   duplicates   confidence 0.6182 – 0.9346
  *   unrelated    confidence 0.0708 – 0.2833
  *   band         (0.2833, 0.6182]   width 0.3348
  *
- * 0.55 sits inside that band, admitting every duplicate in the corpus while
- * staying roughly twice the highest unrelated pair. It is deliberately nearer
- * the top of the band than the middle: a merge that should not have happened
- * destroys a fact, a merge that did not happen leaves a duplicate row.
- *
- * The band only exists because the vetoes come first — 13 of the 24 corpus
- * pairs never reach this comparison. On raw similarity alone the classes
- * overlap and no value works; see the history of this constant.
+ * That band only exists because the vetoes remove 13 of 24 pairs before this
+ * comparison; on raw similarity the classes overlap and no value works. The
+ * number below is inert while MERGE_THRESHOLD is 0.95 — nothing reaches the
+ * gate — and is kept as the calibrated starting point for when the threshold
+ * comes down against real usage data.
  */
 export const MERGE_MIN_CONFIDENCE = 0.55;
 

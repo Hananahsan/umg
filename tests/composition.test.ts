@@ -4,6 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp, type UmgApp } from "../src/app.js";
 import { defaultConfig } from "../src/config.js";
+import {
+  MECHANICS_MERGE_MIN_CONFIDENCE,
+  MECHANICS_MERGE_THRESHOLD,
+} from "./fixtures/merge-tuning.js";
+
 
 /**
  * End-to-end write path, in sequence, asserting on the outcome rather than the parts.
@@ -27,6 +32,8 @@ describe("write path composition", () => {
     cfg.db_path = join(dir, "test.db");
     cfg.log_level = "error";
     cfg.retain.min_importance.semantic = 0.3;
+    cfg.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+    cfg.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
     app = createApp({ cfg });
   });
 

@@ -17,6 +17,10 @@ import {
   SCOPE_DISTINCT,
   UNRELATED,
 } from "./fixtures/labeled-pairs.js";
+import {
+  MECHANICS_MERGE_MIN_CONFIDENCE,
+  MECHANICS_MERGE_THRESHOLD,
+} from "./fixtures/merge-tuning.js";
 
 /**
  * Merge discards a memory, so it needs the same care supersede gets.
@@ -114,6 +118,13 @@ describe("merge safety", () => {
   );
 
   it.each(DUPLICATE)("merges a genuine duplicate: $note", async ({ a, b }) => {
+    // Mechanics, not policy: at the shipped 0.95 default merge does not fire
+    // at all, so this pins a threshold where the algorithm can be observed.
+    app.close();
+    app = build((c) => {
+      c.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+      c.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
+    });
     await seedPair("dup", a, b);
     await app.consolidation.prune({ namespace: "dup" });
     const left = await app.store.list({

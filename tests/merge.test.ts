@@ -4,6 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp, type UmgApp } from "../src/app.js";
 import { defaultConfig } from "../src/config.js";
+import {
+  MECHANICS_MERGE_MIN_CONFIDENCE,
+  MECHANICS_MERGE_THRESHOLD,
+} from "./fixtures/merge-tuning.js";
+
 
 describe("merge on write", () => {
   let dir: string;
@@ -92,10 +97,11 @@ describe("merge on write", () => {
 
 /**
  * The suite above lowers merge_threshold to 0.75 and merges byte-identical text,
- * which the content hash would catch anyway. These run at the shipped default so
- * regressions in real near-duplicate handling actually surface.
+ * which the content hash would catch anyway. These exercise real near-duplicate
+ * handling at a threshold where merge actually fires — see merge-tuning.ts for
+ * why they pin rather than read the shipped default.
  */
-describe("merge at the default threshold", () => {
+describe("merge mechanics", () => {
   let dir: string;
   let app: UmgApp;
 
@@ -105,6 +111,8 @@ describe("merge at the default threshold", () => {
     cfg.db_path = join(dir, "test.db");
     cfg.log_level = "error";
     cfg.retain.min_importance.semantic = 0.3;
+    cfg.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+    cfg.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
     app = createApp({ cfg });
   });
 

@@ -198,3 +198,23 @@ export const MEMORY_TIERS: MemoryTier[] = [
   "semantic",
   "procedural",
 ];
+
+/**
+ * Tiers ordered by expected lifetime, shortest first. Declared explicitly
+ * rather than reusing MEMORY_TIERS's incidental ordering, because merging
+ * depends on it: a memory must never come out of a merge in a shorter-lived
+ * tier than it went in.
+ */
+const TIER_LIFETIME_ORDER: MemoryTier[] = [
+  "working",
+  "episodic",
+  "semantic",
+  "procedural",
+];
+
+/** The longer-lived of two tiers. */
+export function longerLivedTier(a: MemoryTier, b: MemoryTier): MemoryTier {
+  return TIER_LIFETIME_ORDER.indexOf(a) >= TIER_LIFETIME_ORDER.indexOf(b)
+    ? a
+    : b;
+}

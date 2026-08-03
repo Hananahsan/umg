@@ -1,8 +1,8 @@
 import type { UmgConfig } from "../config.js";
 import type { MemoryStore } from "../store/interface.js";
 import type { Memory, MemoryTier, PruneResult } from "../types.js";
-import { MEMORY_TIERS } from "../types.js";
-import { computeDecayScore } from "./scoring.js";
+import { longerLivedTier, MEMORY_TIERS } from "../types.js";
+import { computeDecayScore, defaultExpiresAt } from "./scoring.js";
 import { resolveWriteConflict } from "./contradiction.js";
 import { resolveMerge } from "./merge-policy.js";
 import { emitEvent } from "../observability/events.js";
@@ -410,8 +410,21 @@ export class ConsolidationService {
         ? source.content
         : target.content;
     const now = nowIso();
+
+    // Never move a row down: the merged row takes the longer-lived of the two
+    // tiers, and its expiry is recomputed to match. Without this a prune could
+    // fold a procedural memory into a working one and hand the survivor a 24h
+    // TTL — the same downgrade the write path had.
+    const tier = longerLivedTier(target.tier, source.tier);
+    const expires_at =
+      tier === target.tier
+        ? target.expires_at
+        : defaultExpiresAt(tier, target.created_at);
+
     return this.store.update(target.id, {
       content,
+      tier,
+      expires_at,
       summary: content.slice(0, 160),
       tags: uniqueStrings([...target.tags, ...source.tags]),
       entities: uniqueStrings([...target.entities, ...source.entities]),
@@ -434,7 +447,7 @@ export class ConsolidationService {
       },
       decay_score: computeDecayScore(
         {
-          tier: target.tier,
+          tier,
           importance: Math.max(target.importance, source.importance),
           access_count: target.access_count + source.access_count,
           last_accessed_at: now,

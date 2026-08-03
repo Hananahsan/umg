@@ -5,6 +5,11 @@ import { join } from "node:path";
 import { createApp, type UmgApp } from "../src/app.js";
 import { defaultConfig } from "../src/config.js";
 import { computeDecayScore } from "../src/services/scoring.js";
+import {
+  MECHANICS_MERGE_MIN_CONFIDENCE,
+  MECHANICS_MERGE_THRESHOLD,
+} from "./fixtures/merge-tuning.js";
+
 
 describe("pruning and decay", () => {
   let dir: string;
@@ -24,6 +29,8 @@ describe("pruning and decay", () => {
     cfg.consolidation.grace_period_days = 0;
     cfg.consolidation.auto_promote = false;
     cfg.consolidation.light_prune_every_n_writes = 0;
+    cfg.consolidation.merge_threshold = MECHANICS_MERGE_THRESHOLD;
+    cfg.consolidation.merge_min_confidence = MECHANICS_MERGE_MIN_CONFIDENCE;
     app = createApp({ cfg });
   });
 

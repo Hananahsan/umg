@@ -510,12 +510,22 @@ export class SqliteMemoryStore implements MemoryStore {
     const limit = opts.limit ?? 10;
     const hash = contentHash(content);
 
-    // Exact hash match first
+    // Exact hash match first.
+    //
+    // opts.tiers must be applied here too, not only to the search() branch
+    // below. Without it a hash match ignored mergeCompatibleTiers entirely: a
+    // memory retained as `procedural` was absorbed into an existing `working`
+    // row, kept that row's 24h TTL, and expired the next day. Content survived,
+    // which is why a content-only audit missed it — the retention class did not.
     const exactParams: unknown[] = [hash, "active"];
     let exactSql = `SELECT * FROM memories WHERE content_hash = ? AND status = ?`;
     if (opts.namespace) {
       exactSql += " AND namespace = ?";
       exactParams.push(opts.namespace);
+    }
+    if (opts.tiers && opts.tiers.length > 0) {
+      exactSql += ` AND tier IN (${opts.tiers.map(() => "?").join(",")})`;
+      exactParams.push(...opts.tiers);
     }
     if (opts.exclude_id) {
       exactSql += " AND id != ?";
