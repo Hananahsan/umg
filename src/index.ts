@@ -5,9 +5,7 @@ import { join } from "node:path";
 import { bootstrapApp } from "./app.js";
 import { startMcpServer } from "./mcp/server.js";
 import { log } from "./util/log.js";
-
-/** Keep in sync with package.json version. */
-const VERSION = "0.2.1";
+import { VERSION } from "./util/version.js";
 
 function printHelp(): void {
   const help = `
@@ -25,6 +23,7 @@ Usage:
   umg0 compact [--export-archives]
   umg0 retain --content "..." [--tier semantic] [--namespace global]
   umg0 recall --query "..." [--limit 8]
+  umg0 list [--tier semantic] [--namespace global] [--tags a,b] [--limit 20] [--offset 0] [--status active]
   umg0 reflect --text "..."
   umg0 promote --ids id1,id2 [--title "..."] [--dry-run]
   umg0 version
@@ -154,6 +153,34 @@ async function main(): Promise<void> {
           source: "cli",
         });
         process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+        break;
+      }
+      // `list-memories` matches the MCP tool name, `list` the CLI's verb style.
+      case "list":
+      case "list-memories": {
+        const tier = getFlag(args, "--tier");
+        const limit = getFlag(args, "--limit");
+        const offset = getFlag(args, "--offset");
+        const tags = getFlag(args, "--tags");
+        const memories = await app.memory.list({
+          namespace: getFlag(args, "--namespace"),
+          tiers: tier
+            ? [tier as "working" | "episodic" | "semantic" | "procedural"]
+            : undefined,
+          tags: tags
+            ? tags.split(",").map((s) => s.trim()).filter(Boolean)
+            : undefined,
+          status: getFlag(args, "--status") as
+            | "active"
+            | "archived"
+            | "evicted"
+            | undefined,
+          limit: limit ? Number(limit) : 20,
+          offset: offset ? Number(offset) : undefined,
+        });
+        process.stdout.write(
+          JSON.stringify({ count: memories.length, memories }, null, 2) + "\n",
+        );
         break;
       }
       case "recall": {

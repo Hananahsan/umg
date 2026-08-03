@@ -177,6 +177,7 @@ Copy [config.example.yaml](./config.example.yaml) to `~/.umg/config.yaml` or `./
 umg0 mcp
 umg0 retain --content "..." [--tier semantic] [--namespace global]
 umg0 recall --query "..." [--limit 8]
+umg0 list [--tier semantic] [--namespace global] [--tags a,b] [--limit 20] [--offset 0] [--status active]
 umg0 reflect --text "..."
 umg0 promote --ids id1,id2 [--dry-run]
 umg0 prune [--dry-run] [--aggressive] [--namespace ns]

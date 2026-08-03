@@ -562,6 +562,7 @@ export class SqliteMemoryStore implements MemoryStore {
       ranking_weights: this.cfg?.recall.ranking_weights,
       db_size_bytes,
       db_size_warn: db_size_bytes >= warnAt,
+      fts_available: this.ftsAvailable,
       metrics_7d,
     };
   }

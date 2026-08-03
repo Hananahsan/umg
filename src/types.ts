@@ -187,6 +187,8 @@ export interface StatsSnapshot {
   ranking_weights?: RankingWeights;
   db_size_bytes?: number;
   db_size_warn?: boolean;
+  /** False means BM25 search is off and the degraded LIKE fallback is in use. */
+  fts_available: boolean;
   metrics_7d?: Metrics7d;
 }
 

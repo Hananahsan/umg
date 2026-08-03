@@ -4,11 +4,16 @@ import type { UmgApp } from "../app.js";
 import { registerTools } from "./tools.js";
 import { registerPrompts } from "./prompts.js";
 import { log } from "../util/log.js";
+import { VERSION } from "../util/version.js";
 
-export async function startMcpServer(app: UmgApp): Promise<void> {
+/**
+ * Build the MCP server with tools, prompts and resources registered but no
+ * transport attached, so tests can drive a real handshake in process.
+ */
+export function createMcpServer(app: UmgApp): McpServer {
   const server = new McpServer({
     name: "umg",
-    version: "0.1.0",
+    version: VERSION,
   });
 
   registerTools(server, app);
@@ -58,6 +63,11 @@ export async function startMcpServer(app: UmgApp): Promise<void> {
     },
   );
 
+  return server;
+}
+
+export async function startMcpServer(app: UmgApp): Promise<void> {
+  const server = createMcpServer(app);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   log.info("MCP server listening on stdio");
