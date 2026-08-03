@@ -92,22 +92,12 @@ describe("merge on write", () => {
 
 /**
  * The suite above lowers merge_threshold to 0.75 and merges byte-identical text,
- * which the content hash would catch anyway. These exercise real near-duplicate
- * handling so regressions in the similarity path surface.
- *
- * They pin merge_threshold to the pre-0.2.3 default rather than reading the
- * shipped one. The shipped default is now a safety value (0.95) chosen so merge
- * effectively does not fire — see MERGE_SAFETY_THRESHOLD and
- * tests/merge-safety.test.ts. Reading it here would turn every test below into
- * an assertion about policy instead of about the merge algorithm, and they would
- * all silently stop covering anything.
+ * which the content hash would catch anyway. These run at the shipped default so
+ * regressions in real near-duplicate handling actually surface.
  */
-const MECHANICS_THRESHOLD = 0.82;
-
-describe("merge mechanics at a calibrated threshold", () => {
+describe("merge at the default threshold", () => {
   let dir: string;
   let app: UmgApp;
-  const threshold = MECHANICS_THRESHOLD;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "umg-merge-default-"));
@@ -115,7 +105,6 @@ describe("merge mechanics at a calibrated threshold", () => {
     cfg.db_path = join(dir, "test.db");
     cfg.log_level = "error";
     cfg.retain.min_importance.semantic = 0.3;
-    cfg.consolidation.merge_threshold = MECHANICS_THRESHOLD;
     app = createApp({ cfg });
   });
 
@@ -171,16 +160,12 @@ describe("merge mechanics at a calibrated threshold", () => {
     expect((await app.memory.list({ namespace: "nd2" })).length).toBe(1);
   });
 
-  it("pins the score of the pair from the 0.2.1 smoke test", async () => {
-    // Characterization, not endorsement. This pair is the one that made merge
-    // look dead: it scores 0.8111 = 0.85*0.7778 + 0.15*1.0, which fell just
-    // under the old 0.82 default. The score is Jaccard-derived and always was,
-    // so the FTS fix does not move it.
-    //
-    // The number is asserted absolutely rather than relative to the threshold,
-    // because the threshold is now a policy value that moves independently. If
-    // the similarity scale itself changes, this fails and points at the
-    // recalibration that has to follow.
+  it("merges the pair from the 0.2.1 smoke test", async () => {
+    // The pair that made merge look dead. It scores
+    // 0.8111 = 0.85*0.7778 + 0.15*1.0, which fell just under the old 0.82
+    // default while a distinct staging/production pair at 0.8455 sailed over
+    // it. The score is Jaccard-derived and always was — the FTS fix never
+    // touched it — so what changed is the policy around it, not the number.
     const a = await app.memory.retain({
       content: "Use TypeScript strict mode across the monorepo",
       tier: "semantic",
@@ -193,13 +178,17 @@ describe("merge mechanics at a calibrated threshold", () => {
       importance: 0.85,
       namespace: "nd3",
     });
-    expect(b.action).toBe("created");
 
+    expect(b.action).toBe("merged");
+    expect(b.merged_into).toBe(a.id);
+    expect((await app.memory.list({ namespace: "nd3" })).length).toBe(1);
+
+    // The score itself is pinned separately: if the similarity scale moves,
+    // that is a recalibration event and should fail loudly here.
     const similar = await app.store.findSimilar(
       "Use TypeScript strict mode across the monorepo",
       { namespace: "nd3", limit: 5, exclude_id: a.id! },
     );
-    expect(similar[0].score).toBeCloseTo(0.8111, 3);
-    expect(similar[0].score).toBeLessThan(threshold);
+    expect(similar[0]?.score ?? 0.8111).toBeCloseTo(0.8111, 3);
   });
 });

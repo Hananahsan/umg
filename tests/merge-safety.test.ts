@@ -3,67 +3,50 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp, type UmgApp } from "../src/app.js";
-import { defaultConfig, MERGE_SAFETY_THRESHOLD } from "../src/config.js";
 import {
+  defaultConfig,
+  MERGE_MIN_CONFIDENCE,
+  MERGE_THRESHOLD,
+  type UmgConfig,
+} from "../src/config.js";
+import { resolveWriteConflict } from "../src/services/contradiction.js";
+import { resolveMerge } from "../src/services/merge-policy.js";
+import {
+  DUPLICATE,
   MUST_NOT_COLLAPSE,
   SCOPE_DISTINCT,
+  UNRELATED,
 } from "./fixtures/labeled-pairs.js";
 
 /**
- * Merge discards a memory on a bare threshold — no confidence gate, no
- * additive fallback, unlike supersede. On the current similarity scale
- * (0.85*jaccard + 0.15*entityOverlap) true duplicates and distinct facts
- * overlap, so the threshold is held high until merge is made fail-safe.
+ * Merge discards a memory, so it needs the same care supersede gets.
  *
- * These tests pin the property that matters — a distinct fact is never
- * silently deleted — and record the measurements the threshold rests on.
+ * The guarantee these tests pin is that a distinct fact is never silently
+ * deleted, and that the guarantee is *structural* — it comes from
+ * resolveMerge's vetoes, not from the threshold being set high. That is why
+ * the corpus is replayed at a threshold well below the shipped default.
  */
 
-/** Same fact, reworded. Merging these is correct. */
-const DUPLICATES: Array<[string, string]> = [
-  [
-    "Use TypeScript strict mode across the monorepo",
-    "Use TypeScript strict mode across all the monorepo packages",
-  ],
-  [
-    "The team standup is at 9:30am every weekday",
-    "Team standup is at 9:30am on every weekday",
-  ],
-  ["Prefer pnpm over npm for installs", "Prefer pnpm over npm for package installs"],
-];
-
-/**
- * Different facts sharing a sentence frame. Merging these destroys one of
- * them. None are caught by the contradiction detector today, so the merge
- * threshold is the only thing standing between them and deletion.
- */
-const DISTINCT: Array<[string, string]> = [
-  [
-    "The staging API base URL is https://staging.example.com/v1",
-    "The production API base URL is https://api.example.com/v1",
-  ],
-  [
-    "The team standup is at 9:30am every weekday",
-    "The team retro is at 4:00pm every Friday",
-  ],
-  [
-    "The billing service owner is the payments team",
-    "The search service owner is the discovery team",
-  ],
-];
+/** Far below the shipped pre-filter: nothing here may depend on the threshold. */
+const RECKLESS_THRESHOLD = 0.4;
 
 describe("merge safety", () => {
   let dir: string;
   let app: UmgApp;
 
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "umg-merge-safety-"));
+  const build = (overrides: (c: UmgConfig) => void = () => {}): UmgApp => {
     const cfg = defaultConfig();
-    cfg.db_path = join(dir, "m.db");
+    cfg.db_path = join(dir, `${Math.random().toString(36).slice(2)}.db`);
     cfg.log_level = "error";
     cfg.consolidation.light_prune_every_n_writes = 0;
     cfg.consolidation.auto_promote = false;
-    app = createApp({ cfg });
+    overrides(cfg);
+    return createApp({ cfg });
+  };
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "umg-merge-safety-"));
+    app = build();
   });
 
   afterEach(() => {
@@ -71,11 +54,7 @@ describe("merge safety", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  const seedPair = async (
-    ns: string,
-    a: string,
-    b: string,
-  ): Promise<void> => {
+  const seedPair = async (ns: string, a: string, b: string): Promise<void> => {
     for (const content of [a, b]) {
       await app.memory.retain({
         content,
@@ -86,19 +65,21 @@ describe("merge safety", () => {
     }
   };
 
-  it("keeps the default at the documented safety value", () => {
-    expect(app.cfg.consolidation.merge_threshold).toBe(MERGE_SAFETY_THRESHOLD);
-    expect(MERGE_SAFETY_THRESHOLD).toBeGreaterThanOrEqual(0.95);
+  it("keeps the defaults at the calibrated values", () => {
+    expect(app.cfg.consolidation.merge_threshold).toBe(MERGE_THRESHOLD);
+    expect(app.cfg.consolidation.merge_min_confidence).toBe(MERGE_MIN_CONFIDENCE);
+    // The pre-filter must sit above the highest unrelated pair in the corpus
+    // (0.4722) so those never reach the confidence gate at all.
+    expect(MERGE_THRESHOLD).toBeGreaterThan(0.4722);
   });
 
-  it.each(DISTINCT)(
-    "never destroys a distinct fact: %s",
-    async (a: string, b: string) => {
-      const ns = `d${a.length}${b.length}`;
-      await seedPair(ns, a, b);
-      await app.consolidation.prune({ namespace: ns });
+  it.each(MUST_NOT_COLLAPSE)(
+    "never destroys a distinct fact at the default: $note",
+    async ({ a, b }) => {
+      await seedPair("d", a, b);
+      await app.consolidation.prune({ namespace: "d" });
       const left = await app.store.list({
-        namespace: ns,
+        namespace: "d",
         status: "active",
         limit: 10,
       });
@@ -107,26 +88,20 @@ describe("merge safety", () => {
   );
 
   /**
-   * The property step 3 exists for. Before merge was gated, the only thing
-   * standing between a distinct fact and deletion was the threshold, so the
-   * threshold had to be set high enough to disable merging entirely. Now the
-   * blocks are structural: scope divergence, differing value slots and
-   * two-sided content all veto a merge regardless of how similar the pair
-   * looks. Run the whole must-not-collapse corpus at a threshold low enough
-   * that a bare comparison would collapse most of it.
+   * The property step 3 exists for. Previously the only thing between a
+   * distinct fact and deletion was the threshold, so the threshold had to be
+   * high enough to disable merging entirely. Now scope divergence, differing
+   * value slots and two-sided content veto a merge however similar the pair
+   * looks — so the same corpus must survive a threshold that would otherwise
+   * collapse most of it.
    */
   it.each(MUST_NOT_COLLAPSE)(
     "survives a reckless threshold: $note",
     async ({ a, b }) => {
       app.close();
-      const cfg = defaultConfig();
-      cfg.db_path = join(dir, "reckless.db");
-      cfg.log_level = "error";
-      cfg.consolidation.light_prune_every_n_writes = 0;
-      cfg.consolidation.auto_promote = false;
-      cfg.consolidation.merge_threshold = 0.6;
-      app = createApp({ cfg });
-
+      app = build((c) => {
+        c.consolidation.merge_threshold = RECKLESS_THRESHOLD;
+      });
       await seedPair("reckless", a, b);
       await app.consolidation.prune({ namespace: "reckless" });
       const left = await app.store.list({
@@ -138,18 +113,24 @@ describe("merge safety", () => {
     },
   );
 
-  it("records why a merge was withheld instead of silently skipping", async () => {
-    const cfgLow = 0.6;
-    app.close();
-    const cfg = defaultConfig();
-    cfg.db_path = join(dir, "deferred.db");
-    cfg.log_level = "error";
-    cfg.consolidation.light_prune_every_n_writes = 0;
-    cfg.consolidation.auto_promote = false;
-    cfg.consolidation.merge_threshold = cfgLow;
-    app = createApp({ cfg });
+  it.each(DUPLICATE)("merges a genuine duplicate: $note", async ({ a, b }) => {
+    await seedPair("dup", a, b);
+    await app.consolidation.prune({ namespace: "dup" });
+    const left = await app.store.list({
+      namespace: "dup",
+      status: "active",
+      limit: 10,
+    });
+    expect(left).toHaveLength(1);
+    expect(left[0].parent_ids.length).toBeGreaterThan(0);
+  });
 
-    const [a, b] = [SCOPE_DISTINCT[0].a, SCOPE_DISTINCT[0].b];
+  it("records why a merge was withheld instead of silently skipping", async () => {
+    app.close();
+    app = build((c) => {
+      c.consolidation.merge_threshold = RECKLESS_THRESHOLD;
+    });
+    const { a, b } = SCOPE_DISTINCT[0];
     await seedPair("why", a, b);
     const result = await app.consolidation.prune({
       namespace: "why",
@@ -164,20 +145,13 @@ describe("merge safety", () => {
 
   it("stamps merge_deferred on the write path too", async () => {
     app.close();
-    const cfg = defaultConfig();
-    cfg.db_path = join(dir, "write.db");
-    cfg.log_level = "error";
-    cfg.consolidation.light_prune_every_n_writes = 0;
-    cfg.consolidation.merge_threshold = 0.6;
-    app = createApp({ cfg });
-
-    await app.memory.retain({
-      content: SCOPE_DISTINCT[0].a,
-      tier: "semantic",
-      namespace: "wp",
+    app = build((c) => {
+      c.consolidation.merge_threshold = RECKLESS_THRESHOLD;
     });
+    const { a, b } = SCOPE_DISTINCT[0];
+    await app.memory.retain({ content: a, tier: "semantic", namespace: "wp" });
     const second = await app.memory.retain({
-      content: SCOPE_DISTINCT[0].b,
+      content: b,
       tier: "semantic",
       namespace: "wp",
     });
@@ -187,10 +161,8 @@ describe("merge safety", () => {
     expect(second.memory?.metadata?.merge_reason).toBe("scope_divergent");
   });
 
-  it("does not let --aggressive reopen the merge hole", async () => {
-    // The staging/production pair scores 0.8455 and used to be collapsed;
-    // --aggressive previously shaved 0.05 off the threshold.
-    const [a, b] = DISTINCT[0];
+  it("does not let --aggressive lower the bar", async () => {
+    const { a, b } = SCOPE_DISTINCT[0];
     await seedPair("agg", a, b);
     await app.consolidation.prune({ namespace: "agg", aggressive: true });
     const left = await app.store.list({
@@ -204,29 +176,29 @@ describe("merge safety", () => {
   it("still collapses exact duplicates", async () => {
     const text = "The release train ships every second Tuesday at 14:00 UTC.";
     await seedPair("exact", text, text);
-    const before = await app.store.list({
-      namespace: "exact",
-      status: "active",
-      limit: 10,
-    });
-    expect(before).toHaveLength(2);
+    expect(
+      await app.store.list({ namespace: "exact", status: "active", limit: 10 }),
+    ).toHaveLength(2);
 
     await app.consolidation.prune({ namespace: "exact" });
-    const after = await app.store.list({
-      namespace: "exact",
-      status: "active",
-      limit: 10,
-    });
-    expect(after).toHaveLength(1);
+    expect(
+      await app.store.list({ namespace: "exact", status: "active", limit: 10 }),
+    ).toHaveLength(1);
   });
 
   /**
-   * Not an assertion about the right threshold — a record of why there is not
-   * one yet. If a future change separates these classes, this test starts
-   * failing and the threshold can come down. That is the intended signal.
+   * The measurement the calibration rests on, kept executable so it cannot
+   * drift silently.
+   *
+   * Two claims: raw similarity does NOT separate the classes (which is why a
+   * threshold alone can never be the safety mechanism), and confidence — after
+   * the structural vetoes — DOES, with the band the constants were chosen from.
    */
-  it("records that duplicates and distinct facts are not separable today", async () => {
-    const score = async (a: string, b: string): Promise<number> => {
+  it("records the separation the thresholds are calibrated against", async () => {
+    const measure = async (
+      a: string,
+      b: string,
+    ): Promise<{ similarity: number; confidence: number; reason: string }> => {
       const ns = `s${Math.random().toString(36).slice(2)}`;
       const ra = await app.memory.retain({
         content: a,
@@ -245,21 +217,38 @@ describe("merge safety", () => {
         limit: 5,
         exclude_id: ra.id,
       });
-      return sim[0]?.score ?? 0;
+      const similarity = sim[0]?.score ?? 0;
+      const conflict = resolveWriteConflict(a, b, similarity, 0.5);
+      // Thresholds zeroed so the gates, not the numbers, decide.
+      const m = resolveMerge(a, b, similarity, conflict, 0, 0);
+      return { similarity, confidence: m.confidence, reason: m.reason };
     };
 
-    const dup: number[] = [];
-    for (const [a, b] of DUPLICATES) dup.push(await score(a, b));
-    const dist: number[] = [];
-    for (const [a, b] of DISTINCT) dist.push(await score(a, b));
+    const dup = [];
+    for (const p of DUPLICATE) dup.push(await measure(p.a, p.b));
+    const unrelated = [];
+    for (const p of UNRELATED) unrelated.push(await measure(p.a, p.b));
 
-    // The classes overlap: the best distinct pair outscores the worst
-    // duplicate, so no threshold admits all duplicates without also admitting
-    // a distinct pair.
-    expect(Math.max(...dist)).toBeGreaterThan(Math.min(...dup));
+    // Pairs vetoed outright are safe at any number and do not constrain it.
+    const gated = unrelated.filter(
+      (r) => r.reason !== "differing_values" && r.reason !== "scope_divergent",
+    );
 
-    // And the safety threshold sits above every measured pair, so nothing in
-    // this corpus merges by similarity at the default.
-    expect(Math.max(...dup, ...dist)).toBeLessThan(MERGE_SAFETY_THRESHOLD);
+    const minDupSim = Math.min(...dup.map((r) => r.similarity));
+    const maxUnrelSim = Math.max(...gated.map((r) => r.similarity));
+    const minDupConf = Math.min(...dup.map((r) => r.confidence));
+    const maxUnrelConf = Math.max(...gated.map((r) => r.confidence));
+
+    // Similarity alone leaves almost no room — this is the whole reason the
+    // threshold could not simply be tuned.
+    expect(minDupSim - maxUnrelSim).toBeLessThan(0.2);
+
+    // Confidence, after the vetoes, opens a real band.
+    expect(minDupConf - maxUnrelConf).toBeGreaterThan(0.25);
+
+    // And the shipped values sit inside it.
+    expect(MERGE_MIN_CONFIDENCE).toBeGreaterThan(maxUnrelConf);
+    expect(MERGE_MIN_CONFIDENCE).toBeLessThanOrEqual(minDupConf);
+    expect(MERGE_THRESHOLD).toBeGreaterThan(maxUnrelSim);
   });
 });

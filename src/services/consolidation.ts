@@ -46,11 +46,12 @@ export class ConsolidationService {
     const floor = aggressive
       ? this.cfg.consolidation.eviction_floor * 1.5
       : this.cfg.consolidation.eviction_floor;
-    // --aggressive used to shave 0.05 off the merge threshold. While merge is
-    // held at a provisional safety value (see MERGE_SAFETY_THRESHOLD) that
-    // reduction would walk it straight back into the range where distinct
-    // facts get collapsed, so aggressive now only raises eviction pressure.
-    // Restore the reduction once merge defers instead of discarding.
+    // --aggressive used to shave 0.05 off the merge threshold. It no longer
+    // touches it: the threshold is a calibrated pre-filter sitting just above
+    // the unrelated-pair ceiling, and the real gate is merge_min_confidence.
+    // Lowering the pre-filter would only add deferral noise, and "be more
+    // aggressive" should never mean "be more willing to discard a fact".
+    // Aggressive still raises eviction pressure.
     const mergeThreshold = this.cfg.consolidation.merge_threshold;
     const maxPasses = Math.max(
       1,

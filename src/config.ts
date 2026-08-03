@@ -88,22 +88,37 @@ export interface UmgConfig {
 }
 
 /**
- * Provisional merge threshold. Merge currently lacks the safety machinery the
- * write path has everywhere else: supersede is confidence-gated and falls back
- * to additive on ambiguity, but merge is a bare threshold — above it, one
- * memory is discarded and its content is gone.
+ * Similarity below which a pair is not even considered for merging.
  *
- * Until merge is confidence-gated and defers instead of discarding, this is
- * held high enough that effectively only exact and near-identical duplicates
- * collapse. It is a safety measure, not a calibrated value; do not tune it
- * without a labeled corpus.
+ * This is a cheap pre-filter, not the decision. The decision is
+ * MERGE_MIN_CONFIDENCE below, applied after resolveMerge() has vetoed pairs
+ * that are scoped to different subjects, assert different values, or carry
+ * content on both sides.
+ *
+ * Calibrated against tests/fixtures/labeled-pairs.ts: unrelated pairs top out
+ * at 0.4722 similarity, so 0.55 keeps them from ever reaching the gate.
  */
-export const MERGE_SAFETY_THRESHOLD = 0.95;
+export const MERGE_THRESHOLD = 0.55;
 
-export const MERGE_SAFETY_NOTE =
-  "merge_threshold is a provisional safety value (0.95), not a tuned one: " +
-  "merge discards a memory on a bare threshold, and true duplicates overlap " +
-  "with distinct facts on the current similarity scale.";
+/**
+ * Confidence required to discard one of two memories.
+ *
+ * Measured on the labeled corpus, with structural vetoes applied first:
+ *
+ *   duplicates   confidence 0.6182 – 0.9346
+ *   unrelated    confidence 0.0708 – 0.2833
+ *   band         (0.2833, 0.6182]   width 0.3348
+ *
+ * 0.55 sits inside that band, admitting every duplicate in the corpus while
+ * staying roughly twice the highest unrelated pair. It is deliberately nearer
+ * the top of the band than the middle: a merge that should not have happened
+ * destroys a fact, a merge that did not happen leaves a duplicate row.
+ *
+ * The band only exists because the vetoes come first — 13 of the 24 corpus
+ * pairs never reach this comparison. On raw similarity alone the classes
+ * overlap and no value works; see the history of this constant.
+ */
+export const MERGE_MIN_CONFIDENCE = 0.55;
 
 export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
   fts: 0.32,
@@ -135,25 +150,8 @@ const DEFAULTS: UmgConfig = {
     ranking_weights: { ...DEFAULT_RANKING_WEIGHTS },
   },
   consolidation: {
-    /**
-     * TEMPORARY SAFETY VALUE — not a tuned threshold. See MERGE_SAFETY_NOTE.
-     *
-     * At the previous default of 0.82 merge was destroying data: the pair
-     * "The staging API base URL is https://staging.example.com/v1" and
-     * "The production API base URL is https://api.example.com/v1" scores
-     * 0.8455 on this scale and was collapsed into one row, silently deleting
-     * the production URL. Meanwhile genuine duplicates scoring 0.62–0.81 were
-     * left alone, so 0.82 produced bloat and data loss at the same time.
-     *
-     * Measured against a labeled corpus, true duplicates and distinct facts
-     * overlap on this scale, so no threshold separates them — see
-     * tests/merge-safety.test.ts. 0.95 is chosen to sit above everything the
-     * corpus produces, which means only exact-hash duplicates and
-     * near-identical text still merge. That trades bloat for safety, which is
-     * the correct direction until merge is made fail-safe.
-     */
-    merge_threshold: MERGE_SAFETY_THRESHOLD,
-    merge_min_confidence: 0.75,
+    merge_threshold: MERGE_THRESHOLD,
+    merge_min_confidence: MERGE_MIN_CONFIDENCE,
     merge_max_passes: 3,
     light_prune_every_n_writes: 25,
     eviction_floor: 0.12,

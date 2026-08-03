@@ -24,11 +24,6 @@ describe("pruning and decay", () => {
     cfg.consolidation.grace_period_days = 0;
     cfg.consolidation.auto_promote = false;
     cfg.consolidation.light_prune_every_n_writes = 0;
-    // Pinned to the pre-0.2.3 default. The shipped default is a safety value
-    // (0.95) chosen so merge effectively does not fire; the merge tests below
-    // are about multi-pass mechanics and dry-run parity, not about that policy.
-    // Policy is covered by tests/merge-safety.test.ts.
-    cfg.consolidation.merge_threshold = 0.82;
     app = createApp({ cfg });
   });
 

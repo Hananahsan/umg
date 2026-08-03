@@ -28,14 +28,17 @@ recall:
     entity: 0.16
 
 consolidation:
-  # TEMPORARY SAFETY VALUE, not a tuned one. Merge discards a memory once this
-  # score is crossed, with no confidence gate and no additive fallback — unlike
-  # supersede. On the current similarity scale true duplicates and distinct
-  # facts overlap, so at the old 0.82 default merge was deleting real facts
-  # (e.g. a staging URL absorbing a production URL) while leaving genuine
-  # duplicates split. 0.95 sits above both classes, so only exact and
-  # near-identical duplicates collapse. Lowering it re-enables the data loss.
-  merge_threshold: 0.95
+  # Cheap pre-filter: below this similarity a pair is not considered for
+  # merging at all. It is NOT the safety mechanism — merge_min_confidence is.
+  # Calibrated so unrelated pairs (which top out around 0.47 on the labeled
+  # corpus) never reach the confidence gate.
+  merge_threshold: 0.55
+  # The actual gate. Merging discards a memory, so it requires positive
+  # confidence the two state the same fact. Below this, both rows are kept and
+  # metadata.merge_deferred records why — the same additive-first treatment
+  # ambiguous contradictions get. Measured band on the labeled corpus:
+  # duplicates 0.62–0.93, unrelated 0.07–0.28.
+  merge_min_confidence: 0.55
   merge_max_passes: 3
   light_prune_every_n_writes: 25
   eviction_floor: 0.12

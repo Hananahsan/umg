@@ -109,19 +109,32 @@ Agent-supplied importance is soft-blended (70/30).
 
 On write and full prune: Jaccard + FTS candidates.
 
-- **Merge** when similarity ≥ `merge_threshold` and no contradiction.  
+- **Merge** when similarity ≥ `merge_threshold` (0.55, a pre-filter) **and**
+  merge confidence ≥ `merge_min_confidence` (0.55, the actual gate).  
   Keep richer content, max importance, union tags/entities, lineage via `parent_ids`.
 
-  > **Merge is provisionally disabled by a high threshold (0.95).** Unlike supersede
-  > it has no confidence gate and no additive fallback: cross the threshold and one
-  > memory is discarded. Similarity is `0.85·jaccard + 0.15·entityOverlap`, a purely
-  > lexical scale on which "same fact reworded" and "same template, different value"
-  > overlap — measured, a distinct staging/production URL pair scored 0.8455 while
-  > genuine duplicates scored 0.62–0.81. At the old 0.82 default that produced bloat
-  > and silent data loss simultaneously. 0.95 sits above both classes so only exact
-  > and near-identical duplicates collapse. Restoring a tuned threshold requires
-  > `extractValueSlots` to divert template-identical/value-different pairs to the
-  > contradiction path, and merge to defer rather than discard on ambiguity.
+  Merging discards a memory, so — like supersede — it is confidence-gated and
+  additive on ambiguity. Four things veto it outright:
+
+  | Veto | Meaning |
+  |------|---------|
+  | scope divergence | different environment / replica role / platform — both true |
+  | contradiction | belongs to the supersede path |
+  | differing value slots | each side asserts a value the other does not |
+  | two-sided content | both sides carry content the other lacks; scales confidence down |
+
+  Anything short of the gate keeps both rows and stamps `metadata.merge_deferred`
+  with the reason, mirroring `metadata.conflict_deferred`.
+
+  > **Why a threshold alone was never enough.** Similarity is
+  > `0.85·jaccard + 0.15·entityOverlap`, a lexical scale on which "same fact
+  > reworded" and "same template, different value" overlap: a distinct
+  > staging/production URL pair scored **0.8455** while genuine duplicates scored
+  > **0.62–0.81**. At the 0.82 default that shipped in 0.2.2 and earlier, merge
+  > deleted real facts *and* left duplicates split. With the vetoes applied first,
+  > 13 of 24 corpus pairs never reach the gate at all, and the rest separate
+  > cleanly — duplicates 0.62–0.93 confidence, unrelated 0.07–0.28, a band of
+  > **0.33** where there had been none. See `tests/fixtures/labeled-pairs.ts`.
 - **Supersede** only on **clear** related contradictions (`conflicting_values`, `boolean_flip`,
   or strong negation/correction with high topic overlap). Archive loser; set `supersedes_id`.
 - **Defer (additive-first)** on ambiguous conflicts: insert the new memory, leave prior active,

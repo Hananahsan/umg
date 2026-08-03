@@ -130,10 +130,8 @@ const SEEDS: SeedSpec[] = [
     importance: 0.78,
   },
   {
-    // Kept within one token of the others: Jaccard drops fast. These three
-    // score ~0.93 and so no longer merge at the 0.95 safety threshold — they
-    // are left in as the visible "duplicates the engine is currently leaving
-    // alone" case. The episodic pair below is the one that still collapses.
+    // Kept within one token of the others: Jaccard drops fast, and a pair that
+    // falls under merge_min_confidence stops being treated as a duplicate.
     content:
       "The staging API base URL is https://staging.example.com/v1 for all clients today.",
     tier: "semantic",
@@ -144,10 +142,10 @@ const SEEDS: SeedSpec[] = [
   // Two constraints shape this pair:
   //  - no negation words ("without", "no longer"): those trip the
   //    contradiction detector and turn a duplicate into a supersede;
-  //  - findSimilar scores jaccard*0.85 + entity*0.15, so clearing the merge
-  //    threshold needs the same token set. A reordered paraphrase does exactly
-  //    that, scoring 1.0 — which keeps it merging even at the 0.95 safety
-  //    threshold, so the replay always has a merge to show.
+  //  - findSimilar scores jaccard*0.85 + entity*0.15, and merge confidence
+  //    scales that down by how much unique content each side carries. A
+  //    reordered paraphrase is perfectly one-sided, so it scores 1.0 and always
+  //    merges — the replay is guaranteed a merge to show.
   {
     content:
       "Deployed the billing service to production from the release-42 branch on Thursday.",
