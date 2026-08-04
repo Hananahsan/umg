@@ -140,11 +140,20 @@ describe("inspector read-only guarantee", () => {
       await expect(
         store.update(first.id, { importance: 0.1 }),
       ).rejects.toThrow(ReadOnlyViolationError);
-      await expect(store.delete(first.id)).rejects.toThrow(ReadOnlyViolationError);
       await expect(store.purgeArchivedOlderThan("2000-01-01T00:00:00.000Z")).rejects.toThrow(
         ReadOnlyViolationError,
       );
       expect(() => store.vacuum()).toThrow(ReadOnlyViolationError);
+
+      // delete() is no longer on the port, so there is nothing here to refuse.
+      // The guarantee moved from a runtime throw to an absence: the inspector
+      // holds a MemoryStore, and a MemoryStore cannot hard-delete a row. Assert
+      // the absence, so re-adding delete() to the port fails here rather than
+      // quietly restoring an unaudited removal path.
+      expect((store as unknown as Record<string, unknown>).delete).toBeUndefined();
+      expect(
+        (store as unknown as Record<string, unknown>).deleteUnaudited,
+      ).toBeUndefined();
     } finally {
       app.close();
     }

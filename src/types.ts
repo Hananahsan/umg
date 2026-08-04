@@ -130,6 +130,17 @@ export interface PruneResult {
   merged: number;
   archived: number;
   purged: number;
+  /**
+   * Ids hard-deleted by the archive-retention purge, in full.
+   *
+   * The retention invariant treats a memory's disappearance as a violation
+   * unless it appears here — so this is the exception list, and an exception
+   * list that can be truncated is a hole. `details` is capped at 100 entries
+   * for payload size; this deliberately is not, or clause A would fire on
+   * every sanctioned purge past the hundredth and the fix would look like
+   * weakening the clause.
+   */
+  purged_ids: string[];
   promoted: number;
   proposed_skills?: Array<Record<string, unknown>>;
   details: Array<Record<string, unknown>>;

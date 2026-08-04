@@ -189,7 +189,7 @@ describe("sqlite FTS5", () => {
     expect((await s.search({ text: "Jenkins", namespace: "test" })).length).toBe(0);
     expect((await s.search({ text: "Actions", namespace: "test" })).length).toBe(1);
 
-    await s.delete(m.id);
+    await s.deleteUnaudited(m.id);
     expect((await s.search({ text: "Actions", namespace: "test" })).length).toBe(0);
   });
 

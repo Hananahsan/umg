@@ -39,7 +39,7 @@ export class ConsolidationService {
     let decayed = 0;
     let merged = 0;
     let archived = 0;
-    let purged = 0;
+    let purged_ids: string[] = [];
     let promoted = 0;
     let proposed_skills: Array<Record<string, unknown>> | undefined;
 
@@ -344,12 +344,16 @@ export class ConsolidationService {
           now,
           -this.cfg.consolidation.archive_retention_days,
         );
-        purged = await this.store.purgeArchivedOlderThan(cutoff);
-        if (purged > 0) {
+        // One call site feeds both the audit list and the human-facing detail,
+        // so the two cannot drift. purged_ids is the substrate the retention
+        // invariant checks against; `details` is capped at 100 and carries the
+        // count only, which is why the ids do not live there.
+        purged_ids = await this.store.purgeArchivedOlderThan(cutoff);
+        if (purged_ids.length > 0) {
           details.push({
             action: "purge_archives",
             reason: "archive_retention",
-            count: purged,
+            count: purged_ids.length,
             cutoff,
           });
         }
@@ -361,7 +365,8 @@ export class ConsolidationService {
       decayed,
       merged,
       archived,
-      purged,
+      purged: purged_ids.length,
+      purged_ids,
       promoted,
       proposed_skills,
       details: details.slice(0, 100),
@@ -376,7 +381,7 @@ export class ConsolidationService {
           decayed,
           merged,
           archived,
-          purged,
+          purged: purged_ids.length,
           promoted,
           at: now,
         }),
@@ -386,6 +391,10 @@ export class ConsolidationService {
     await emitEvent(this.store, this.cfg, "prune", {
       ...result,
       details: result.details.length,
+      // The event log is not the audit substrate — purgeOldEvents trims it
+      // from emitEvent itself, so it truncates its own history. Keep the count
+      // here and leave the ids to the returned PruneResult.
+      purged_ids: result.purged_ids.length,
       light,
       aggressive,
       namespace: opts.namespace ?? null,
@@ -397,7 +406,7 @@ export class ConsolidationService {
       decayed,
       merged,
       archived,
-      purged,
+      purged: purged_ids.length,
       promoted,
     });
 

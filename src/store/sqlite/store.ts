@@ -325,7 +325,16 @@ export class SqliteMemoryStore implements MemoryStore {
     return merged;
   }
 
-  async delete(id: string): Promise<void> {
+  /**
+   * Hard-delete one row, leaving no audit record and no way back.
+   *
+   * Deliberately absent from the MemoryStore port. The service layer archives
+   * instead, so a memory always has a path back; the only sanctioned removal
+   * is purgeArchivedOlderThan(), which reports the ids it took. This exists
+   * for code that has reached for the concrete adapter on purpose — seeding
+   * the demo dataset, and asserting the FTS delete trigger fires.
+   */
+  async deleteUnaudited(id: string): Promise<void> {
     this.db.prepare("DELETE FROM memories WHERE id = ?").run(id);
   }
 
@@ -612,13 +621,16 @@ export class SqliteMemoryStore implements MemoryStore {
     return res.changes;
   }
 
-  async purgeArchivedOlderThan(isoCutoff: string): Promise<number> {
-    const res = this.db
+  async purgeArchivedOlderThan(isoCutoff: string): Promise<string[]> {
+    // RETURNING rather than SELECT-then-DELETE: the ids reported are exactly
+    // the rows the statement removed, with no window in between for the two to
+    // disagree. Requires SQLite 3.35+; better-sqlite3 ships well past that.
+    const rows = this.db
       .prepare(
-        `DELETE FROM memories WHERE status = 'archived' AND updated_at < ?`,
+        `DELETE FROM memories WHERE status = 'archived' AND updated_at < ? RETURNING id`,
       )
-      .run(isoCutoff);
-    return res.changes;
+      .all(isoCutoff) as Array<{ id: string }>;
+    return rows.map((r) => r.id);
   }
 
   async stats(defaultNamespace: string): Promise<StatsSnapshot> {

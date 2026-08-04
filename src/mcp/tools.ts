@@ -190,11 +190,16 @@ export function registerTools(server: McpServer, app: UmgApp): void {
       aggressive: z.boolean().optional().default(false),
     },
     async (args) => {
-      const result = await app.consolidation.prune({
+      const { purged_ids, ...result } = await app.consolidation.prune({
         dry_run: args.dry_run,
         namespace: args.namespace,
         aggressive: args.aggressive,
       });
+      // purged_ids is untruncated on purpose, which makes it the wrong thing to
+      // put in a model's context — a large purge would spend thousands of
+      // tokens on opaque ULIDs. `purged` already carries the number, and the
+      // ids are for the retention invariant and the inspector, both of which
+      // call prune() directly.
       return textResult(result);
     },
   );

@@ -3,7 +3,6 @@ import { defaultConfig, type UmgConfig } from "../config.js";
 import { SqliteMemoryStore } from "../store/sqlite/store.js";
 import { ReadOnlyStore } from "../store/readonly.js";
 import type { MemoryService } from "../services/memory.js";
-import type { MemoryStore } from "../store/interface.js";
 
 export const DEMO_NAMESPACE = "demo";
 
@@ -63,9 +62,15 @@ interface SeedSpec {
   tags?: string[];
 }
 
+/**
+ * Typed against the concrete adapter, not the port, because ageing a seed row
+ * needs deleteUnaudited() — a raw row delete that the port deliberately does
+ * not expose. Reaching for SqliteMemoryStore here is the signal that this is
+ * fixture construction and not something the service layer may do.
+ */
 async function seed(
   memory: MemoryService,
-  store: MemoryStore,
+  store: SqliteMemoryStore,
 ): Promise<void> {
   for (const spec of SEEDS) {
     const result = await memory.retain({
@@ -93,7 +98,7 @@ async function seed(
       ? new Date(Date.now() - spec.ageDays * DAY_MS).toISOString()
       : null;
 
-    await store.delete(seeded.id);
+    await store.deleteUnaudited(seeded.id);
     await store.put({
       ...seeded,
       created_at: aged ?? seeded.created_at,

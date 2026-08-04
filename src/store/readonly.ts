@@ -27,7 +27,7 @@ export class ReadOnlyViolationError extends Error {
  * Two classes of write exist in the service layer, and they need different
  * treatment:
  *
- *   - Memory mutations (put/update/delete/archive/purge/vacuum) must never
+ *   - Memory mutations (put/update/archive/purge/vacuum) must never
  *     happen. Reaching one during a dry run is a bug, so these throw loudly
  *     and the test suite asserts they never fire.
  *
@@ -149,15 +149,11 @@ export class ReadOnlyStore implements MemoryStore {
     throw new ReadOnlyViolationError("update");
   }
 
-  async delete(_id: string): Promise<void> {
-    throw new ReadOnlyViolationError("delete");
-  }
-
   async archive(_id: string): Promise<void> {
     throw new ReadOnlyViolationError("archive");
   }
 
-  async purgeArchivedOlderThan(_isoCutoff: string): Promise<number> {
+  async purgeArchivedOlderThan(_isoCutoff: string): Promise<string[]> {
     throw new ReadOnlyViolationError("purgeArchivedOlderThan");
   }
 

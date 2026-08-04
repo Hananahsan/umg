@@ -18,8 +18,12 @@ export interface MemoryStore {
   put(memory: Memory): Promise<Memory>;
   get(id: string): Promise<Memory | null>;
   update(id: string, patch: Partial<Memory>): Promise<Memory>;
-  delete(id: string): Promise<void>;
   archive(id: string): Promise<void>;
+  // No delete(). Archiving is the only removal the service layer may perform,
+  // because it is the only one with a path back. A raw row delete leaves no
+  // audit record and no way to recover the content, so it lives off the port
+  // as SqliteMemoryStore.deleteUnaudited() and is reachable only by code that
+  // has deliberately reached for the concrete adapter (seeding, FTS tests).
 
   search(query: SearchQuery): Promise<ScoredMemory[]>;
   list(filter: ListFilter): Promise<Memory[]>;
@@ -33,7 +37,19 @@ export interface MemoryStore {
   logEvent(event: MemoryEvent): Promise<void>;
   listEvents(limit?: number): Promise<MemoryEvent[]>;
   purgeOldEvents(maxEvents: number): Promise<number>;
-  purgeArchivedOlderThan(isoCutoff: string): Promise<number>;
+
+  /**
+   * Hard-delete archived memories last touched before `isoCutoff`.
+   *
+   * Returns the ids removed, not a count. This is the only sanctioned path by
+   * which a memory's content leaves the database for good, so the retention
+   * invariant needs to tell "purged under policy" apart from "vanished" — and
+   * it can only do that from ids. Returning the ids rather than a count makes
+   * the auditable form the only form: a caller cannot obtain the number
+   * without also holding the evidence, so there is no shape of this call that
+   * silently drops the record. `.length` is the count.
+   */
+  purgeArchivedOlderThan(isoCutoff: string): Promise<string[]>;
 
   stats(defaultNamespace: string): Promise<StatsSnapshot>;
 
